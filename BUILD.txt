@@ -1,0 +1,7 @@
+ON WINDOWS
+
+# 32
+cmake .. -DEIGEN3_INCLUDE_DIR=C:\work\libraries\eigen\ -DBOOST_ROOT=C:\work\libraries\boost_1_58\ -DBoost_USE_STATIC_LIBS=On
+
+# 64
+cmake .. -DEIGEN3_INCLUDE_DIR=C:\work\libraries\eigen\ -DBOOST_ROOT=C:\work\libraries\boost_1_58_x64\ -DBoost_USE_STATIC_LIBS=On -DMKL=TRUE -DMKL_ROOT="C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\mkl" -G"Visual Studio 14 2015 Win64"
