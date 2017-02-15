@@ -28,7 +28,7 @@ The structure of data folder
 
 ```
 ./data/glove/glove.6B.zip
-./data/sst/
+./data/sst/{train|dev|test}.txt
 ```
 
 You can download the data by running:
