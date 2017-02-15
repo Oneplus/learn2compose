@@ -66,7 +66,8 @@ dynet::expr::Expression SSTModel::reinforce(dynet::ComputationGraph & cg,
       dynet::expr::pick(dynet::expr::softmax(logits), action));
 
     if (TransitionSystem::is_shift(action)) {
-      shift_function(stack, word_emb.embed(inst.sentence[state.beta]), zero_padding);
+      auto p = word_emb.embed(inst.sentence[state.beta]);
+      shift_function(stack, p, zero_padding);
       TransitionSystem::shift(state);
     } else {
       reduce_function(stack);
