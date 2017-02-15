@@ -80,7 +80,8 @@ dynet::expr::Expression SNLIModel::rollin(dynet::ComputationGraph & cg,
 
     probs.push_back(dynet::expr::pick(dynet::expr::softmax(logits), action));
     if (TransitionSystem::is_shift(action)) {
-      shift_function(stack, word_emb.embed(sentence[state.beta]), zero_padding);
+      auto p = word_emb.embed(sentence[state.beta]);
+      shift_function(stack, p, zero_padding);
       TransitionSystem::shift(state);
     } else {
       reduce_function(stack);
