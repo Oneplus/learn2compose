@@ -1,3 +1,6 @@
 [submodule "dynet"]
 	path = dynet
 	url = https://github.com/clab/dynet.git
+[submodule "eigen"]
+	path = eigen
+	url = https://github.com/RLovelett/eigen.git
