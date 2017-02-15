@@ -36,10 +36,21 @@ struct SNLIModel : public Reinforce {
   dynet::expr::Expression reinforce(dynet::ComputationGraph & cg,
                                     const SNLIInstance & inst);
 
+  dynet::expr::Expression rollin(dynet::ComputationGraph & cg,
+                                 const std::vector<unsigned> & sentence,
+                                 std::vector<dynet::expr::Expression> & probs);
+
+  dynet::expr::Expression decode(dynet::ComputationGraph & cg,
+                                 const std::vector<unsigned> & sentence);
+
   unsigned predict(const SNLIInstance & inst);
 
+  dynet::expr::Expression get_score_logits(dynet::expr::Expression & s1,
+                                           dynet::expr::Expression & s2);
+
   dynet::expr::Expression get_policy_logits(const State & state,
-                                            const SNLIInstance & inst);
+                                            const std::vector<unsigned> & sentence,
+                                            const std::vector<TreeLSTMCell> & stack);
 };
 
 #endif  //  end for CLASSIFIER_H
