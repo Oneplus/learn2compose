@@ -43,15 +43,9 @@ dynet::expr::Expression SNLIModel::reinforce(dynet::ComputationGraph & cg,
   std::vector<dynet::expr::Expression> probs2;
   dynet::expr::Expression s1 = rollin(cg, inst.sentence1, probs1);
   dynet::expr::Expression s2 = rollin(cg, inst.sentence2, probs2);
-  dynet::expr::Expression u = dynet::expr::square(s1 - s2);
-  dynet::expr::Expression v = dynet::expr::cmult(s1, s2);
 
-  dynet::expr::Expression q = classifier_merger.get_output(u, v, s1, s2);
   dynet::expr::Expression reward = dynet::expr::pickneglogsoftmax(
-    classifier_scorer.get_output(
-    dynet::expr::rectify(classifier_merger.get_output(s1, s2, u, v))),
-    inst.label
-  );
+    get_score_logits(s1, s2), inst.label);
 
   std::vector<dynet::expr::Expression> loss;
   for (unsigned i = 0; i < probs1.size(); ++i) { loss.push_back(probs1[i] * reward); }
@@ -86,7 +80,8 @@ dynet::expr::Expression SNLIModel::rollin(dynet::ComputationGraph & cg,
 
     probs.push_back(dynet::expr::pick(dynet::expr::softmax(logits), action));
     if (TransitionSystem::is_shift(action)) {
-      shift_function(stack, word_emb.embed(sentence[state.beta]), zero_padding);
+      auto p = word_emb.embed(sentence[state.beta]);
+      shift_function(stack, p, zero_padding);
       TransitionSystem::shift(state);
     } else {
       reduce_function(stack);
@@ -121,7 +116,8 @@ dynet::expr::Expression SNLIModel::decode(dynet::ComputationGraph & cg,
     }
 
     if (TransitionSystem::is_shift(action)) {
-      shift_function(stack, word_emb.embed(sentence[state.beta]), zero_padding);
+      auto p = word_emb.embed(sentence[state.beta]);
+      shift_function(stack, p, zero_padding);
       TransitionSystem::shift(state);
     } else {
       reduce_function(stack);
@@ -133,24 +129,22 @@ dynet::expr::Expression SNLIModel::decode(dynet::ComputationGraph & cg,
 
 unsigned SNLIModel::predict(const SNLIInstance & inst) {
   dynet::ComputationGraph cg;
+  new_graph(cg);
+
   dynet::expr::Expression s1 = decode(cg, inst.sentence1);
   dynet::expr::Expression s2 = decode(cg, inst.sentence2);
-  dynet::expr::Expression u = dynet::expr::square(s1 - s2);
-  dynet::expr::Expression v = dynet::expr::cmult(s1, s2);
-
-  dynet::expr::Expression q = classifier_merger.get_output(u, v, s1, s2);
-  dynet::expr::Expression pred_expr = dynet::expr::pickneglogsoftmax(
-    classifier_scorer.get_output(
-    dynet::expr::rectify(classifier_merger.get_output(s1, s2, u, v))),
-    inst.label
-  );
+  dynet::expr::Expression pred_expr = get_score_logits(s1, s2);
 
   std::vector<float> pred_score = dynet::as_vector(cg.get_value(pred_expr));
   return std::max_element(pred_score.begin(), pred_score.end()) - pred_score.begin();
 }
 
 dynet::expr::Expression SNLIModel::get_score_logits(dynet::expr::Expression & s1, dynet::expr::Expression & s2) {
-  return dynet::expr::Expression();
+  dynet::expr::Expression u = dynet::expr::square(s1 - s2);
+  dynet::expr::Expression v = dynet::expr::cmult(s1, s2);
+
+  return classifier_scorer.get_output(
+    dynet::expr::rectify(classifier_merger.get_output(s1, s2, u, v)));
 }
 
 dynet::expr::Expression SNLIModel::get_policy_logits(const State & state,

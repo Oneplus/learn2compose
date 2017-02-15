@@ -79,7 +79,8 @@ void SSTCorpus::parse_data(const std::string& data, SSTInstance& input, bool tra
     assert(input.label < n_classes);
   }
   std::vector<std::string> tokens;
-  boost::algorithm::split(tokens, data.substr(p), boost::is_any_of(" "), boost::token_compress_on);
+  std::string sentence_str = data.substr(p);
+  boost::algorithm::split(tokens, sentence_str, boost::is_any_of(" "), boost::token_compress_on);
 
   input.sentence.clear();
   for (const auto& token : tokens) {
