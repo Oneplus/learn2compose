@@ -2,6 +2,24 @@ learn2compose
 =============
 An reproduction of [Learning to Compose Words into Sentences with Reinforcement Learning](https://arxiv.org/abs/1611.09100).
 
+## Code Structure
+
+* `alphabet.{cc|h}`: use to convert word type into index
+* `layer.{cc|h}`: a high-level (layer-level) library based on dynet, support Merge, LSTM, and other network like Keras.
+* `logging.{cc|h}`: logging library
+* `system.{cc|h}`: the transition system, define State and the behaviour of SHIFT/REDUCE action.
+* `trainer_utils.{cc|h}`: initialize different trainers
+* `sst.cc`: main function for sst
+* `sst_corpus.{cc|h} <- corpus.{cc|h}`: use to store and parse SST dataset
+* `sst_model.{cc|h} <- reinforce.{cc|h}`:
+    * `reinforce.{cc|h}`
+        * `rollin`: roll-in/sampling a sequence of transition and return the final sentence representation.
+        * `shift_function|reduce_function`: define perform Tree-LSTM composition
+        * store parameters for Tree-LSTM
+    * `sst_model.{cc|h}`
+        * store parameters for policy network and classifier
+        * `reinforce`: use the sentence representation from `rollin` to calculate the probability for classes.
+
 ## Stanford Sentiment Treebank (SST)
 
 ### Data Preparation
@@ -48,8 +66,8 @@ If success, you should found the executable `./bin/learn2compose_sst`. To run th
 ./bin/learn2compose_sst --dynet-mem 1024 \
     --dynet-seed 1234 \
     -T ./data/sst/train.plain.2class.txt \
-    -d ./data/sst/train.plain.2class.txt \
-    -t ./data/sst/train.plain.2class.txt \
+    -d ./data/sst/dev.plain.2class.txt \
+    -t ./data/sst/test.plain.2class.txt \
     -w ./data/glove/glove.6B.100d.txt.sst_filtered \
     --word_dim 100 \
     --hidden_dim 200 \
