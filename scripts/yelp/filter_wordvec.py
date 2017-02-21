@@ -21,4 +21,4 @@ print(0, 100)
 for line in open(sys.argv[1], 'r'):
 	word = line.strip().split()[0]
 	if word in vocab:
-		print line.strip()
+		print(line.strip())

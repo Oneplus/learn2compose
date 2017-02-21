@@ -103,8 +103,7 @@ unsigned SSTModel::predict(const SSTInstance & inst) {
 
     if (shift_valid && reduce_valid) {
       dynet::expr::Expression logits = get_policy_logits(state, inst);
-      std::vector<float> score = dynet::as_vector(
-        cg.get_value(dynet::expr::softmax(logits)));
+      std::vector<float> score = dynet::as_vector(cg.get_value(logits));
       action = (score[0] > score[1] ? 0 : 1);
     } else if (shift_valid) {
       action = TransitionSystem::get_shift_id();
