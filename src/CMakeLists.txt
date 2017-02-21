@@ -31,11 +31,21 @@ add_executable (learn2compose_sst
 	sst_model.cc
 	sst_model.h
 	)
+	
+add_executable (learn2compose_yelp
+	yelp.cc
+	yelp_corpus.cc
+	yelp_corpus.h
+	yelp_model.cc
+	yelp_model.h
+	)
 
 if (MSVC)
 	target_link_libraries (learn2compose_snli dynet common ${Boost_LIBRARIES} ${LIBS})
 	target_link_libraries (learn2compose_sst dynet common ${Boost_LIBRARIES} ${LIBS})
+	target_link_libraries (learn2compose_yelp dynet common ${Boost_LIBRARIES} ${LIBS})
 else()
 	target_link_libraries (learn2compose_snli dynet common ${Boost_LIBRARIES} ${LIBS} z)
 	target_link_libraries (learn2compose_sst dynet common ${Boost_LIBRARIES} ${LIBS} z)
+	target_link_libraries (learn2compose_yelp dynet common ${Boost_LIBRARIES} ${LIBS} z)
 endif()

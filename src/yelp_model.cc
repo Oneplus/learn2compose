@@ -1,18 +1,18 @@
-#include "sst_model.h"
+#include "yelp_model.h"
 #include <random>
 
-SSTModel::SSTModel(dynet::Model & m,
-                   unsigned word_size,
-                   unsigned word_dim,
-                   unsigned hidden_dim,
-                   unsigned n_classes,
-                   const std::unordered_map<unsigned, std::vector<float>> & embeddings)
+YelpModel::YelpModel(dynet::Model & m,
+                     unsigned word_size,
+                     unsigned word_dim,
+                     unsigned hidden_dim,
+                     unsigned n_classes,
+                     const std::unordered_map<unsigned, std::vector<float>> & embeddings)
   : Reinforce(m, word_dim),
   policy_merger(m, word_dim, word_dim, word_dim, hidden_dim),
   policy_scorer(m, hidden_dim, TransitionSystem::n_actions),
   classifier_projector(m, word_dim, hidden_dim),
   classifier_scorer(m, hidden_dim, n_classes),
-  word_emb(m, word_size, word_dim),
+  word_emb(m, word_size, word_dim, false),
   p_sigma_guard_j(m.add_parameters({ word_dim, 1 })),
   p_sigma_guard_i(m.add_parameters({ word_dim, 1 })),
   p_beta_guard(m.add_parameters({ word_dim, 1 })),
@@ -24,7 +24,7 @@ SSTModel::SSTModel(dynet::Model & m,
   }
 }
 
-void SSTModel::new_graph_impl(dynet::ComputationGraph & cg) {
+void YelpModel::new_graph_impl(dynet::ComputationGraph & cg) {
   policy_merger.new_graph(cg);
   policy_scorer.new_graph(cg);
   classifier_projector.new_graph(cg);
@@ -37,9 +37,9 @@ void SSTModel::new_graph_impl(dynet::ComputationGraph & cg) {
   zero_padding = dynet::expr::zeroes(cg, { word_dim });
 }
 
-dynet::expr::Expression SSTModel::reinforce(dynet::ComputationGraph & cg,
-                                            const SSTInstance & inst) {
-  unsigned len = inst.sentence.size();
+dynet::expr::Expression YelpModel::reinforce(dynet::ComputationGraph & cg,
+                                             const YelpInstance & inst) {
+  unsigned len = inst.document.size();
   new_graph(cg);
 
   State state(len);
@@ -49,7 +49,7 @@ dynet::expr::Expression SSTModel::reinforce(dynet::ComputationGraph & cg,
     bool shift_valid = TransitionSystem::is_valid(state, TransitionSystem::get_shift_id());
     bool reduce_valid = TransitionSystem::is_valid(state, TransitionSystem::get_reduce_id());
     unsigned action;
-     
+
     dynet::expr::Expression logits = get_policy_logits(state, inst);
     if (shift_valid && reduce_valid) {
       dynet::expr::Expression prob_expr = dynet::expr::softmax(logits);
@@ -66,8 +66,7 @@ dynet::expr::Expression SSTModel::reinforce(dynet::ComputationGraph & cg,
       dynet::expr::pick(dynet::expr::softmax(logits), action));
 
     if (TransitionSystem::is_shift(action)) {
-      auto p = word_emb.embed(inst.sentence[state.beta]);
-      shift_function(stack, p, zero_padding);
+      shift_function(stack, sentence_expr(inst, state.beta), zero_padding);
       TransitionSystem::shift(state);
     } else {
       reduce_function(stack);
@@ -78,9 +77,9 @@ dynet::expr::Expression SSTModel::reinforce(dynet::ComputationGraph & cg,
   // neg -> minimize
   dynet::expr::Expression reward = dynet::expr::pickneglogsoftmax(
     classifier_scorer.get_output(
-      dynet::expr::rectify(classifier_projector.get_output(stack[0].first))),
+    dynet::expr::rectify(classifier_projector.get_output(stack[0].first))),
     inst.label
-    );
+  );
   // return reward;
 
   std::vector<dynet::expr::Expression> loss;
@@ -90,8 +89,8 @@ dynet::expr::Expression SSTModel::reinforce(dynet::ComputationGraph & cg,
   return dynet::expr::sum(loss);
 }
 
-unsigned SSTModel::predict(const SSTInstance & inst) {
-  unsigned len = inst.sentence.size();
+unsigned YelpModel::predict(const YelpInstance & inst) {
+  unsigned len = inst.document.size();
   dynet::ComputationGraph cg;
   new_graph(cg);
   stack.clear();
@@ -113,8 +112,7 @@ unsigned SSTModel::predict(const SSTInstance & inst) {
     }
 
     if (TransitionSystem::is_shift(action)) {
-      auto p = word_emb.embed(inst.sentence[state.beta]);
-      shift_function(stack, p, zero_padding);
+      shift_function(stack, sentence_expr(inst, state.beta), zero_padding);
       TransitionSystem::shift(state);
     } else {
       reduce_function(stack);
@@ -128,10 +126,17 @@ unsigned SSTModel::predict(const SSTInstance & inst) {
   return std::max_element(pred_score.begin(), pred_score.end()) - pred_score.begin();
 }
 
-dynet::expr::Expression SSTModel::get_policy_logits(const State & state,
-                                                    const SSTInstance & inst) {
+dynet::expr::Expression YelpModel::get_policy_logits(const State & state,
+                                                     const YelpInstance & inst) {
   dynet::expr::Expression h_j = (stack.size() > 0 ? stack.back().first : sigma_guard_j);
   dynet::expr::Expression h_i = (stack.size() > 1 ? stack[stack.size() - 2].first : sigma_guard_i);
-  dynet::expr::Expression p = (state.beta < state.n) ? word_emb.embed(inst.sentence[state.beta]) : beta_guard;
+  dynet::expr::Expression p = (state.beta < state.n) ? sentence_expr(inst, state.beta) : beta_guard;
   return policy_scorer.get_output(dynet::expr::rectify(policy_merger.get_output(h_i, h_j, p)));
+}
+
+dynet::expr::Expression YelpModel::sentence_expr(const YelpInstance & inst, unsigned sid) {
+  std::vector<dynet::expr::Expression> sentence_expr;
+  const std::vector<unsigned> & sentence = inst.document[sid];
+  for (const auto & word : sentence) { sentence_expr.push_back(word_emb.embed(word)); }
+  return dynet::expr::average(sentence_expr);
 }
