@@ -66,7 +66,8 @@ dynet::expr::Expression YelpModel::reinforce(dynet::ComputationGraph & cg,
       dynet::expr::pick(dynet::expr::softmax(logits), action));
 
     if (TransitionSystem::is_shift(action)) {
-      shift_function(stack, sentence_expr(inst, state.beta), zero_padding);
+      dynet::expr::Expression p = sentence_expr(inst, state.beta);
+      shift_function(stack, p, zero_padding);
       TransitionSystem::shift(state);
     } else {
       reduce_function(stack);
@@ -102,8 +103,7 @@ unsigned YelpModel::predict(const YelpInstance & inst) {
 
     if (shift_valid && reduce_valid) {
       dynet::expr::Expression logits = get_policy_logits(state, inst);
-      std::vector<float> score = dynet::as_vector(
-        cg.get_value(dynet::expr::softmax(logits)));
+      std::vector<float> score = dynet::as_vector(cg.get_value(logits));
       action = (score[0] > score[1] ? 0 : 1);
     } else if (shift_valid) {
       action = TransitionSystem::get_shift_id();
@@ -112,7 +112,8 @@ unsigned YelpModel::predict(const YelpInstance & inst) {
     }
 
     if (TransitionSystem::is_shift(action)) {
-      shift_function(stack, sentence_expr(inst, state.beta), zero_padding);
+      dynet::expr::Expression p = sentence_expr(inst, state.beta);
+      shift_function(stack, p, zero_padding);
       TransitionSystem::shift(state);
     } else {
       reduce_function(stack);
