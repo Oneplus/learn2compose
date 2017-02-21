@@ -37,15 +37,31 @@ python ./scripts/download.py
 ```
 You can also cheat the downloader by putting the wordvec file and sst file in the corresponding directory.
 
-Next, convert SST into binary classification data (format: `{label}\t{sentence}`) and filter the wordvec file (nltk is needed):
+Next, extract SST from tree structure.
 ```
-python ./scripts/extract_sst.py ./data/sst/train.txt > ./data/sst/train.plain.5class.txt
-python ./scripts/extract_sst.py ./data/sst/dev.txt > ./data/sst/dev.plain.5class.txt
-python ./scripts/extract_sst.py ./data/sst/test.txt > ./data/sst/test.plain.5class.txt
-python ./scripts/5to2.py ./data/sst/train.plain.5class.txt > ./data/sst/train.plain.2class.txt
-python ./scripts/5to2.py ./data/sst/dev.plain.5class.txt > ./data/sst/dev.plain.2class.txt
-python ./scripts/5to2.py ./data/sst/test.plain.5class.txt > ./data/sst/test.plain.2class.txt
-python ./scripts/filter_wordvec.py ./data/glove/glove.6B.100d.txt ./data/sst/train.plain.5class.txt ./data/sst/dev.plain.5class.txt ./data/sst/test.plain.5class.txt > ./data/glove/glove.6B.100d.txt.sst_filtered
+python ./scripts/sst/extract_lower_sst.py ./data/sst/train.txt > ./data/sst/train.lower.5class.txt
+python ./scripts/sst/extract_lower_sst.py ./data/sst/dev.txt > ./data/sst/dev.lower.5class.txt
+python ./scripts/sst/extract_lower_sst.py ./data/sst/test.txt > ./data/sst/test.lower.5class.txt
+```
+
+Convert SST into binary classification data (format: `{label}\t{sentence}`) and filter the wordvec file (nltk is needed):
+```
+python ./scripts/sst/5to2.py ./data/sst/train.lower.5class.txt > ./data/sst/train.lower.2class.txt
+python ./scripts/sst/5to2.py ./data/sst/dev.lower.5class.txt > ./data/sst/dev.lower.2class.txt
+python ./scripts/sst/5to2.py ./data/sst/test.lower.5class.txt > ./data/sst/test.lower.2class.txt
+```
+
+Build vocabulary (to replace low-frequent word into UNK) and replace to UNK
+```
+python ./scripts/sst/extract_vocab.py ./data/sst/train.plain.2class.txt 1 > ./data/sst/train.unk_1.vocab
+python ./scrtips/sst/unk_dataset_by_vocab.py ./data/sst/train.lower.2class.txt ./data/sst/train.unk_1.vocab > ./data/sst/train.lower_unk1.2class.txt
+python ./scrtips/sst/unk_dataset_by_vocab.py ./data/sst/dev.lower.2class.txt ./data/sst/train.unk_1.vocab > ./data/sst/dev.lower_unk1.2class.txt
+python ./scrtips/sst/unk_dataset_by_vocab.py ./data/sst/test.lower.2class.txt ./data/sst/train.unk_1.vocab > ./data/sst/test.lower_unk1.2class.txt
+```
+
+Filter word vector.
+```
+python ./scripts/sst/filter_wordvec.py ./data/glove/glove.6B.100d.txt ./data/sst/train.lower_unk1.2class.txt ./data/sst/dev.lower_unk1.2class.txt ./data/sst/test.lower_unk1.2class.txt > ./data/glove/glove.6B.100d.txt.sst_unk1_filtered
 ```
 
 ###  Compile
@@ -65,10 +81,10 @@ If success, you should found the executable `./bin/learn2compose_sst`. To run th
 ```
 ./bin/learn2compose_sst --dynet-mem 1024 \
     --dynet-seed 1234 \
-    -T ./data/sst/train.plain.2class.txt \
-    -d ./data/sst/dev.plain.2class.txt \
-    -t ./data/sst/test.plain.2class.txt \
-    -w ./data/glove/glove.6B.100d.txt.sst_filtered \
+    -T ./data/sst/train.lower_unk1.2class.txt \
+    -d ./data/sst/dev.lower_unk1.2class.txt \
+    -t ./data/sst/test.lower_unk1.2class.txt \
+    -w ./data/glove/glove.6B.100d.txt.sst_unk1_filtered \
     --word_dim 100 \
     --hidden_dim 200 \
     --optimizer_enable_clipping true \
@@ -80,4 +96,4 @@ If success, you should found the executable `./bin/learn2compose_sst`. To run th
 
 | Hyperparameters | Dev | Test |
 |-----|-----|-----|
-|seed=1234, l2=0| 83.6 | 80.9 |
+|seed=1234, l2=0| 81.6 | 82.2 |
