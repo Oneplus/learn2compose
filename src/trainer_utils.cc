@@ -2,6 +2,7 @@
 #include "logging.h"
 #include <fstream>
 #include <sstream>
+#include <boost/algorithm/string.hpp>
 
 po::options_description get_optimizer_options() {
   po::options_description cmd("Optimizer options");
@@ -67,6 +68,92 @@ dynet::Trainer* get_trainer(const po::variables_map& conf, dynet::Model& model) 
     _INFO << "Trainer:: eta decay = disabled";
   }
   return trainer;
+}
+
+void get_objective_sequence(std::string expr,
+                            unsigned max_iter,
+                            std::vector<Model::Param> & seq) {
+  // supported expressions:
+  //  - "right_reward_1(sample_policy_1,sample_reward_1)+"
+  //  - "right_reward_1"
+  //  - "(sample_policy_1,sample_reward_1)+"
+  auto p = expr.find('(');
+  if (p != std::string::npos) {
+    if (p == 0) {
+      auto p2 = expr.find(')');
+      get_objective_sequence_parse_loop(expr, max_iter, seq);
+    } else {
+      std::string pretrain_str = expr.substr(0, p);
+      unsigned time;
+      Model::POLICY_TYPE policy_type = Model::kSample;
+      Model::OBJECTIVE_TYPE objective_type = Model::kBothPolicyAndReward;
+      get_objective_sequence_parse_one_param(pretrain_str, time, policy_type, objective_type);
+      for (unsigned t = 0; t < time; ++t) {
+        seq.push_back(std::make_pair(policy_type, objective_type));
+      }
+      std::string loop_str = expr.substr(p + 1);
+      get_objective_sequence_parse_loop(loop_str, max_iter, seq);
+    }
+  } else {
+    unsigned time;
+    Model::POLICY_TYPE policy_type = Model::kSample;
+    Model::OBJECTIVE_TYPE objective_type = Model::kBothPolicyAndReward;
+    get_objective_sequence_parse_one_param(expr, time, policy_type, objective_type);
+    while (seq.size() < max_iter) {
+      seq.push_back(std::make_pair(policy_type, objective_type));
+    }
+  }
+}
+
+void get_objective_sequence_parse_loop(const std::string & expr,
+                                       unsigned max_iter,
+                                       std::vector<Model::Param>& seq) {
+  auto p2 = expr.find(')');
+  std::string loop_body_str = expr.substr(1, p2 - 1);
+  std::string loop_time_str = expr.substr(p2);
+  std::vector<std::string> tokens;
+  boost::algorithm::split(tokens, loop_body_str, boost::is_any_of(","));
+  unsigned i = 0;
+  while (seq.size() < max_iter) {
+    unsigned time;
+    Model::POLICY_TYPE policy_type = Model::kSample;
+    Model::OBJECTIVE_TYPE objective_type = Model::kBothPolicyAndReward;
+    get_objective_sequence_parse_one_param(tokens[i], time, policy_type, objective_type);
+    for (unsigned t = 0; t < time; ++t) {
+      seq.push_back(std::make_pair(policy_type, objective_type));
+    }
+    i++;
+    if (i == tokens.size()) { i = 0; }
+  }
+}
+
+void get_objective_sequence_parse_one_param(const std::string & expr,
+                                            unsigned & time, 
+                                            Model::POLICY_TYPE & policy_type,
+                                            Model::OBJECTIVE_TYPE & objective_type) {
+  std::vector<std::string> params;
+  boost::algorithm::split(params, expr, boost::is_any_of("_"));
+  assert(params.size() == 3);
+  time = boost::lexical_cast<unsigned>(params[2]);
+  if (boost::algorithm::to_lower_copy(params[0]) == "right") {
+    policy_type = Model::kRight;
+  } else if (boost::algorithm::to_lower_copy(params[0]) == "left") {
+    policy_type = Model::kLeft;
+  } else {
+    policy_type = Model::kSample;
+  }
+  if (boost::algorithm::to_lower_copy(params[1]) == "policy") {
+    objective_type = Model::kPolicyOnly;
+  } else if (boost::algorithm::to_lower_copy(params[1]) == "reward") {
+    objective_type = Model::kRewardOnly;
+  } else {
+    objective_type = Model::kBothPolicyAndReward;
+  }
+  if ((policy_type == Model::kLeft || policy_type == Model::kRight) &&
+    (objective_type == Model::kPolicyOnly || objective_type == Model::kBothPolicyAndReward)) {
+    _WARN << "fix policy (code=" << policy_type
+      << "), but objective (code=" << objective_type << ") contains policy network part";
+  }
 }
 
 void update_trainer(const po::variables_map& conf, dynet::Trainer* trainer) {

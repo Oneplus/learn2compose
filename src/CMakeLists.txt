@@ -8,10 +8,12 @@ add_library (common
 	logging.h
 	layer.cc
 	layer.h
+	model.cc
+	model.h
 	system.cc
 	system.h
-	reinforce.cc
-	reinforce.h
+	treelstm.cc
+	treelstm.h
 	trainer_utils.cc
 	trainer_utils.h
 	)

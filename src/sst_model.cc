@@ -1,21 +1,20 @@
 #include "sst_model.h"
-#include <random>
 
-SSTModel::SSTModel(dynet::Model & m,
-                   unsigned word_size,
+SSTModel::SSTModel(unsigned word_size,
                    unsigned word_dim,
                    unsigned hidden_dim,
                    unsigned n_classes,
-                   const std::unordered_map<unsigned, std::vector<float>> & embeddings)
-  : Reinforce(m, word_dim),
-  policy_merger(m, word_dim, word_dim, word_dim, hidden_dim),
-  policy_scorer(m, hidden_dim, TransitionSystem::n_actions),
-  classifier_projector(m, word_dim, hidden_dim),
-  classifier_scorer(m, hidden_dim, n_classes),
-  word_emb(m, word_size, word_dim),
-  p_sigma_guard_j(m.add_parameters({ word_dim, 1 })),
-  p_sigma_guard_i(m.add_parameters({ word_dim, 1 })),
-  p_beta_guard(m.add_parameters({ word_dim, 1 })),
+                   TransitionSystem & system,
+                   TreeLSTMStateBuilder & state_builder,
+                   const Embeddings & embeddings,
+                   const std::string & policy_name) :
+  Model(system, state_builder, policy_name),
+  policy_projector(state_builder.m, state_builder.state_repr_dim(), hidden_dim),
+  policy_scorer(state_builder.m, hidden_dim, system.num_actions()),
+  classifier_projector(state_builder.m, state_builder.final_repr_dim(), hidden_dim),
+  classifier_scorer(state_builder.m, hidden_dim, n_classes),
+  word_emb(state_builder.m, word_size, word_dim),
+  n_actions(system.num_actions()),
   n_classes(n_classes),
   word_dim(word_dim) {
 
@@ -24,113 +23,81 @@ SSTModel::SSTModel(dynet::Model & m,
   }
 }
 
-void SSTModel::new_graph_impl(dynet::ComputationGraph & cg) {
-  policy_merger.new_graph(cg);
+void SSTModel::new_graph(dynet::ComputationGraph & cg) {
+  policy_projector.new_graph(cg);
   policy_scorer.new_graph(cg);
   classifier_projector.new_graph(cg);
   classifier_scorer.new_graph(cg);
   word_emb.new_graph(cg);
-
-  sigma_guard_j = dynet::expr::parameter(cg, p_sigma_guard_j);
-  sigma_guard_i = dynet::expr::parameter(cg, p_sigma_guard_i);
-  beta_guard = dynet::expr::parameter(cg, p_beta_guard);
-  zero_padding = dynet::expr::zeroes(cg, { word_dim });
 }
 
-dynet::expr::Expression SSTModel::reinforce(dynet::ComputationGraph & cg,
-                                            const SSTInstance & inst) {
-  unsigned len = inst.sentence.size();
+dynet::expr::Expression SSTModel::objective(dynet::ComputationGraph & cg,
+                                            const SSTInstance & inst,
+                                            OBJECTIVE_TYPE objective_type) {
   new_graph(cg);
-
-  State state(len);
-  stack.clear();
+  unsigned len = inst.sentence.size();
+  std::vector<dynet::expr::Expression> input(len);
+  for (unsigned i = 0; i < len; ++i) { input[i] = word_emb.embed(inst.sentence[i]); }
   std::vector<dynet::expr::Expression> transition_probs;
-  while (!TransitionSystem::is_terminated(state)) {
-    bool shift_valid = TransitionSystem::is_valid(state, TransitionSystem::get_shift_id());
-    bool reduce_valid = TransitionSystem::is_valid(state, TransitionSystem::get_reduce_id());
-    unsigned action;
-     
-    dynet::expr::Expression logits = get_policy_logits(state, inst);
-    if (shift_valid && reduce_valid) {
-      dynet::expr::Expression prob_expr = dynet::expr::softmax(logits);
-      std::vector<float> prob = dynet::as_vector(cg.get_value(prob_expr));
-      std::discrete_distribution<unsigned> distrib(prob.begin(), prob.end());
-      action = distrib(*(dynet::rndeng));
-    } else if (shift_valid) {
-      action = TransitionSystem::get_shift_id();
-    } else {
-      action = TransitionSystem::get_reduce_id();
-    }
-
-    transition_probs.push_back(
-      dynet::expr::pick(dynet::expr::softmax(logits), action));
-
-    if (TransitionSystem::is_shift(action)) {
-      auto p = word_emb.embed(inst.sentence[state.beta]);
-      shift_function(stack, p, zero_padding);
-      TransitionSystem::shift(state);
-    } else {
-      reduce_function(stack);
-      TransitionSystem::reduce(state);
-    }
+  dynet::expr::Expression final_repr;
+  if (policy_type == kSample) {
+    final_repr = reinforce(cg, input, transition_probs);
+  } else if (policy_type == kLeft) {
+    final_repr = left(cg, input, transition_probs);
+  } else {
+    final_repr = right(cg, input, transition_probs);
   }
 
   // neg -> minimize
-  dynet::expr::Expression reward = dynet::expr::pickneglogsoftmax(
-    classifier_scorer.get_output(
-      dynet::expr::rectify(classifier_projector.get_output(stack[0].first))),
-    inst.label
-    );
-  // return reward;
+  dynet::expr::Expression reward =
+    dynet::expr::pickneglogsoftmax(get_classifier_logits(final_repr), inst.label);
 
-  std::vector<dynet::expr::Expression> loss;
-  for (unsigned i = 0; i < transition_probs.size(); ++i) {
-    loss.push_back(transition_probs[i] * reward);
+  if (policy_type == kRight || policy_type == kLeft || objective_type == kRewardOnly) {
+    return reward;
+  } else {
+    std::vector<dynet::expr::Expression> loss;
+    if (objective_type == kPolicyOnly) {
+      float rwd = dynet::as_scalar(cg.get_value(reward));
+      for (unsigned i = 0; i < transition_probs.size(); ++i) {
+        loss.push_back(transition_probs[i] * rwd);
+      }
+    } else if (objective_type == kBothPolicyAndReward) {
+      for (unsigned i = 0; i < transition_probs.size(); ++i) {
+        loss.push_back(transition_probs[i] * reward);
+      }
+    }
+    return dynet::expr::sum(loss);
   }
-  return dynet::expr::sum(loss);
 }
 
 unsigned SSTModel::predict(const SSTInstance & inst) {
-  unsigned len = inst.sentence.size();
   dynet::ComputationGraph cg;
   new_graph(cg);
-  stack.clear();
-  State state(len);
-  while (!TransitionSystem::is_terminated(state)) {
-    bool shift_valid = TransitionSystem::is_valid(state, TransitionSystem::get_shift_id());
-    bool reduce_valid = TransitionSystem::is_valid(state, TransitionSystem::get_reduce_id());
-    unsigned action;
+  unsigned len = inst.sentence.size();
+  std::vector<dynet::expr::Expression> input(len);
+  for (unsigned i = 0; i < len; ++i) { input[i] = word_emb.embed(inst.sentence[i]); }
 
-    if (shift_valid && reduce_valid) {
-      dynet::expr::Expression logits = get_policy_logits(state, inst);
-      std::vector<float> score = dynet::as_vector(cg.get_value(logits));
-      action = (score[0] > score[1] ? 0 : 1);
-    } else if (shift_valid) {
-      action = TransitionSystem::get_shift_id();
-    } else {
-      action = TransitionSystem::get_reduce_id();
-    }
-
-    if (TransitionSystem::is_shift(action)) {
-      auto p = word_emb.embed(inst.sentence[state.beta]);
-      shift_function(stack, p, zero_padding);
-      TransitionSystem::shift(state);
-    } else {
-      reduce_function(stack);
-      TransitionSystem::reduce(state);
-    }
+  dynet::expr::Expression final_repr;
+  if (policy_type == kSample) {
+    final_repr = decode(cg, input);
+  } else if (policy_type == kLeft) {
+    final_repr = left(cg, input);
+  } else {
+    final_repr = right(cg, input);
   }
 
-  dynet::expr::Expression pred_expr = classifier_scorer.get_output(
-    dynet::expr::rectify(classifier_projector.get_output(stack[0].first)));
+  dynet::expr::Expression pred_expr = get_classifier_logits(final_repr);
   std::vector<float> pred_score = dynet::as_vector(cg.get_value(pred_expr));
   return std::max_element(pred_score.begin(), pred_score.end()) - pred_score.begin();
 }
 
-dynet::expr::Expression SSTModel::get_policy_logits(const State & state,
-                                                    const SSTInstance & inst) {
-  dynet::expr::Expression h_j = (stack.size() > 0 ? stack.back().first : sigma_guard_j);
-  dynet::expr::Expression h_i = (stack.size() > 1 ? stack[stack.size() - 2].first : sigma_guard_i);
-  dynet::expr::Expression p = (state.beta < state.n) ? word_emb.embed(inst.sentence[state.beta]) : beta_guard;
-  return policy_scorer.get_output(dynet::expr::rectify(policy_merger.get_output(h_i, h_j, p)));
+dynet::expr::Expression SSTModel::get_policy_logits(TreeLSTMState * machine) {
+  return policy_scorer.get_output(dynet::expr::rectify(
+    policy_projector.get_output(machine->state_repr()))
+  );
+}
+
+dynet::expr::Expression SSTModel::get_classifier_logits(dynet::expr::Expression repr) {
+  return classifier_scorer.get_output(dynet::expr::rectify(
+    classifier_projector.get_output(repr)));
 }

@@ -21,7 +21,7 @@ unsigned Corpus::get_or_add_word(const std::string& word) {
 
 void load_word_embeddings(const std::string& embedding_file,
                           unsigned dim,
-                          std::unordered_map<unsigned, std::vector<float> >& embeddings,
+                          Embeddings & embeddings,
                           Corpus& corpus) {
   embeddings[corpus.get_or_add_word(Corpus::BAD0)] = std::vector<float>(dim, 0.);
   embeddings[corpus.get_or_add_word(Corpus::UNK)] = std::vector<float>(dim, 0.);
