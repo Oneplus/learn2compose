@@ -178,8 +178,6 @@ dynet::expr::Expression Model::right(dynet::ComputationGraph & cg,
   while (!state.is_terminated()) {
     std::vector<unsigned> valid_actions;
     system.get_valid_actions(state, valid_actions);
-    dynet::expr::Expression logits = get_policy_logits(machine);
-    dynet::expr::Expression prob_expr = dynet::expr::softmax(logits);
     unsigned action = system.get_shift();
     if (!system.is_valid(state, action)) { action = system.get_reduce(); }
 
@@ -220,6 +218,13 @@ dynet::expr::Expression Model::right(dynet::ComputationGraph & cg,
 }
 
 void Model::set_policy(const std::string & policy_name) {
+  if (policy_name == "left") {
+    policy_type = kLeft;
+  } else if (policy_name == "right") {
+    policy_type = kRight;
+  } else {
+    policy_type = kSample;
+  }
 }
 
 void Model::set_policy(const POLICY_TYPE & policy_type_) {

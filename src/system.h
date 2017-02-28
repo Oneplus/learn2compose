@@ -1,10 +1,11 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
+#include <iostream>
 #include <vector>
 
 struct State {
-  State(unsigned n_) : n(n_), nid(n_), beta(0), heads(n_) {}
+  State(unsigned n_);
 
   std::vector<unsigned> sigma;
   std::vector<unsigned> heads;
@@ -12,13 +13,11 @@ struct State {
   unsigned nid;
   unsigned beta;
 
-  bool is_terminated() {
-    return (sigma.size() == 1 && beta >= n);
-  }
+  bool is_terminated() const;
 };
 
 struct TransitionSystem {
-  virtual unsigned num_actions() = 0;
+  virtual unsigned num_actions() const = 0;
   virtual bool is_valid(const State & state, const unsigned & action) = 0;
   virtual void get_valid_actions(const State & state, std::vector<unsigned> & actions) = 0;
   virtual void perform_action(State & state, const unsigned & action) = 0;
@@ -27,7 +26,7 @@ struct TransitionSystem {
 };
 
 struct ConstituentSystem : public TransitionSystem {
-  unsigned num_actions() { return 2; }
+  unsigned num_actions() const { return 2; }
   void get_valid_actions(const State & state, std::vector<unsigned> & actions);
   void perform_action(State & state, const unsigned & action) override;
   bool is_valid(const State & state, const unsigned & action) override;
@@ -44,7 +43,7 @@ struct ConstituentSystem : public TransitionSystem {
 };
 
 struct DependencySystem : public TransitionSystem {
-  unsigned num_actions() { return 3; }
+  unsigned num_actions() const { return 3; }
   void get_valid_actions(const State & state, std::vector<unsigned> & actions);
   void perform_action(State & state, const unsigned & action) override;
   bool is_valid(const State & state, const unsigned & action) override;

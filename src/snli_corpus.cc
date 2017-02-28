@@ -76,7 +76,7 @@ bool SNLICorpus::parse_data(const std::string& data, SNLIInstance& input, bool t
   if (gold_label != "neutral" && gold_label != "entailment" && gold_label != "contradiction") {
     return false;
   }
-  input.label == (gold_label[0] == 'n' ? 0 : (gold_label[0] == 'e' ? 1 : 2));
+  input.label = (gold_label[0] == 'n' ? 0 : (gold_label[0] == 'e' ? 1 : 2));
   
   std::string sentence1 = pt.get_value("sentence1_binary_parse");
   std::replace(sentence1.begin(), sentence1.end(), '(', ' ');

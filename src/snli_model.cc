@@ -47,7 +47,7 @@ dynet::expr::Expression SNLIModel::reinforce(dynet::ComputationGraph & cg,
   dynet::expr::Expression s1 = rollin(cg, inst.sentence1, probs1);
   dynet::expr::Expression s2 = rollin(cg, inst.sentence2, probs2);
 
-  dynet::expr::Expression reward = dynet::expr::pickneglogsoftmax((s1, s2), inst.label);
+  dynet::expr::Expression reward = dynet::expr::pickneglogsoftmax(get_classifier_logits(s1, s2), inst.label);
 
   std::vector<dynet::expr::Expression> loss;
   for (unsigned i = 0; i < probs1.size(); ++i) { loss.push_back(probs1[i] * reward); }
