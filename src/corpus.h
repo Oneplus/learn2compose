@@ -29,9 +29,11 @@ struct Corpus {
   unsigned get_or_add_word(const std::string& word);
 };
 
+typedef std::unordered_map<unsigned, std::vector<float>> Embeddings;
+
 void load_word_embeddings(const std::string& embedding_file,
                           unsigned dim,
-                          std::unordered_map<unsigned, std::vector<float> >& embeddings,
+                          Embeddings & embeddings,
                           Corpus& corpus);
 
 #endif  //  end for CORPUS_H

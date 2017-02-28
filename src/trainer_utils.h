@@ -5,6 +5,7 @@
 #include <set>
 #include <boost/program_options.hpp>
 #include "corpus.h"
+#include "model.h"
 #include "dynet/model.h"
 #include "dynet/training.h"
 
@@ -14,6 +15,19 @@ po::options_description get_optimizer_options();
 
 dynet::Trainer* get_trainer(const po::variables_map& conf,
                             dynet::Model& model);
+
+void get_objective_sequence(std::string expr,
+                            unsigned max_iter,
+                            std::vector<Model::Param> & seq);
+
+void get_objective_sequence_parse_loop(const std::string & expr,
+                                       unsigned max_iter,
+                                       std::vector<Model::Param> & seq);
+
+void get_objective_sequence_parse_one_param(const std::string & expr,
+                                            unsigned & time,
+                                            Model::POLICY_TYPE & policy_type,
+                                            Model::OBJECTIVE_TYPE & objective_type);
 
 void update_trainer(const po::variables_map& conf,
                     dynet::Trainer* trainer);

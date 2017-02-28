@@ -14,6 +14,9 @@ namespace po = boost::program_options;
 void init_command_line(int argc, char* argv[], po::variables_map& conf) {
   po::options_description general_opt("General options");
   general_opt.add_options()
+    ("system", po::value<std::string>()->default_value("cons"), "The type of tree lstm")
+    ("policy", po::value<std::string>()->default_value("sample"), "The policy name.")
+    ("objective_sequence", po::value<std::string>()->default_value("sample_both_+"), "The learning method [joint].")
     ("training_data,T", po::value<std::string>(), "The path to the training data.")
     ("embedding,w", po::value<std::string>(), "The path to the embedding file.")
     ("devel_data,d", po::value<std::string>(), "The path to the development data.")
@@ -90,29 +93,42 @@ int main(int argc, char* argv[]) {
 
   dynet::Model model;
   dynet::Trainer* trainer = get_trainer(conf, model);
-  YelpModel engine(model,
-                   corpus.word_map.size(),
+  std::string policy_name = conf["policy"].as<std::string>();
+  std::string system_name = conf["system"].as<std::string>();
+  TransitionSystem * system = get_system(system_name);
+  TreeLSTMStateBuilder * state_builder = get_state_builder(system_name,
+                                                           model,
+                                                           conf["word_dim"].as<unsigned>());
+  YelpModel engine(corpus.word_map.size(),
                    conf["word_dim"].as<unsigned>(),
                    conf["hidden_dim"].as<unsigned>(),
                    corpus.n_classes,
-                   embeddings);
+                   *system,
+                   *state_builder,
+                   embeddings,
+                   policy_name);
 
-  std::string name = "l2c.model.yelp." +
+  std::string name = "l2c.model.yelp." + system_name + "." + policy_name + "." +
     boost::lexical_cast<std::string>(portable_getpid());
 
   unsigned max_iter = conf["max_iter"].as<unsigned>();
   float llh = 0.f, llh_in_batch = 0.f;
   float best_dev_p = 0.f, test_p = 0.f;
   unsigned logc = 0;
+  std::string objective_sequence = conf["objective_sequence"].as<std::string>();
+  std::vector<Model::Param> seq;
+  get_objective_sequence(objective_sequence, max_iter, seq);
   for (unsigned iter = 0; iter < max_iter; ++iter) {
+    engine.set_policy(seq[iter].first);
     llh = 0.f;
-    _INFO << "Main:: start of iteration #" << iter;
+    _INFO << "Main:: start of iteration #" << iter << ", objective code=("
+      << seq[iter].first << ", " << seq[iter].second << ")";
     std::shuffle(orders.begin(), orders.end(), (*dynet::rndeng));
     for (unsigned sid : orders) {
       YelpInstance& inst = corpus.training_instances[sid];
       {
         dynet::ComputationGraph cg;
-        dynet::expr::Expression l = engine.reinforce(cg, inst);
+        dynet::expr::Expression l = engine.objective(cg, inst, seq[iter].second);
         float lp = dynet::as_scalar(cg.forward(l));
         cg.backward(l);
         trainer->update();

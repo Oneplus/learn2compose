@@ -2,14 +2,20 @@
 #include <unordered_map>
 #include <boost/program_options.hpp>
 #include "logging.h"
+#include "trainer_utils.h"
 #include "snli_corpus.h"
 #include "snli_model.h"
 #include "dynet/init.h"
+#if _MSC_VER
+#include <process.h>
+#endif
 namespace po = boost::program_options;
 
 void init_command_line(int argc, char* argv[], po::variables_map& conf) {
-  po::options_description cmd("An implementation of learning to compose word into sentence for SNLI dataset.");
-  cmd.add_options()
+  po::options_description general_opt("An implementation of learning to compose word into sentence for SNLI dataset.");
+  general_opt.add_options()
+    ("system", po::value<std::string>()->default_value("cons"), "The type of tree lstm")
+    ("policy", po::value<std::string>()->default_value("sample"), "The policy name.")
     ("training_data,T", po::value<std::string>(), "The path to the training data.")
     ("embedding", po::value<std::string>(), "The path to the embedding file.")
     ("devel_data,d", po::value<std::string>(), "The path to the development data.")
@@ -17,6 +23,10 @@ void init_command_line(int argc, char* argv[], po::variables_map& conf) {
     ("word_dim", po::value<unsigned>()->default_value(100), "The dimension of embedding.")
     ("max_iter", po::value<unsigned>()->default_value(10), "The number of iteration.")
     ;
+  po::options_description optimizer_opt = get_optimizer_options();
+  po::options_description cmd("An implementation of learning to compose word into sentence for SNLI dataset");
+  cmd.add(general_opt).add(optimizer_opt);
+
   po::store(po::parse_command_line(argc, argv, cmd), conf);
   if (conf.count("help")) {
     std::cerr << cmd << std::endl;

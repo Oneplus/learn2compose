@@ -96,9 +96,12 @@ You can run the SST experiments with:
 
 ### Results
 
-| Hyperparameters | Dev | Test |
-|-----|-----|-----|
-|seed=1234, l2=0| 81.6 | 82.2 |
+| Model | Hyperparameters | Dev | Test |
+|------|-----|-----|-----|
+| system=constituent, policy=REINFORCE | seed=1234, l2=0 | 81.7 | 83.1 |
+| system=constituent, policy=left | seed=1234, l2=0 | 81.9 | 81.3 |
+| system=dependency, policy=REINFORCE | seed=1234, l2=0 | 81.3 | 80.8 |
+| system=dependency, policy=left | seed=1234, l2=0 |  |  |
 
 ## YELP
 
@@ -144,7 +147,7 @@ python ./scripts/yelp/filter_wordvec.py ./data/glove/glove.6B.100d.txt ./data/ye
 ```
 
 ### Run
-You can run the SST experiments with:
+You can run the YELP experiments with:
 ```
 ./bin/learn2compose_sst --dynet-mem 1024 \
     --dynet-seed 1234 \
@@ -160,3 +163,11 @@ You can run the SST experiments with:
 ```
 
 ### Result
+
+On small dataset (1,000), self test:
+
+| Model | Hyperparameters | Self |
+|------|-----|-----|
+| system=constituent, obj=(REINFORCE_joint_+), iter=1K | seed=1234, l2=0 | 82.0 |
+| system=constituent, obj=(left_reward_+), iter=100 | seed=1234, l2=0 | 100. |
+| system=constituent, obj=left_reward_10,(sample_policy_1,sample_reward_1), iter=100 | seed=1234, l2=0 | 99.4 |
