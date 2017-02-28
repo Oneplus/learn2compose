@@ -1,6 +1,14 @@
 #include "system.h"
 #include "logging.h"
 
+
+State::State(unsigned n_) : heads(n_), n(n_), nid(n_), beta(0) {
+}
+
+bool State::is_terminated() const {
+  return (sigma.size() == 1 && beta >= n);
+}
+
 void ConstituentSystem::get_valid_actions(const State & state,
                                           std::vector<unsigned>& actions) {
   if (state.beta < state.n) {

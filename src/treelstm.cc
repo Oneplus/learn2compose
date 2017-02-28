@@ -51,7 +51,7 @@ void ConstituentTreeLSTMModel::new_graph(dynet::ComputationGraph & cg) {
 }
 
 ConstituentTreeLSTMState::ConstituentTreeLSTMState(ConstituentTreeLSTMModel & treelstm_model) 
-  : treelstm_model(treelstm_model), beta(0) {
+  : beta(0), treelstm_model(treelstm_model) {
 }
 
 void ConstituentTreeLSTMState::initialize(const std::vector<dynet::expr::Expression>& input) {
@@ -140,8 +140,8 @@ void DependencyTreeLSTMModel::new_graph(dynet::ComputationGraph & cg) {
   beta_guard = dynet::expr::parameter(cg, p_beta_guard);
 }
 
-DependencyTreeLSTMState::DependencyTreeLSTMState(DependencyTreeLSTMModel & treelstm_model) :
-  treelstm_model(treelstm_model), beta(0) {
+DependencyTreeLSTMState::DependencyTreeLSTMState(DependencyTreeLSTMModel & treelstm_model) 
+  : beta(0), treelstm_model(treelstm_model) {
 }
 
 void DependencyTreeLSTMState::initialize(const std::vector<dynet::expr::Expression>& input) {

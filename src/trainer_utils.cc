@@ -80,7 +80,6 @@ void get_objective_sequence(std::string expr,
   auto p = expr.find('(');
   if (p != std::string::npos) {
     if (p == 0) {
-      auto p2 = expr.find(')');
       get_objective_sequence_parse_loop(expr, max_iter, seq);
     } else {
       std::string pretrain_str = expr.substr(0, p);

@@ -18,9 +18,9 @@ struct SNLIModel {
   Merge4Layer classifier_merger;
   DenseLayer classifier_scorer;
   SymbolEmbedding word_emb;
-  unsigned word_dim;
   unsigned n_actions;
   unsigned n_classes;
+  unsigned word_dim;
 
   SNLIModel(unsigned word_size,
             unsigned word_dim,
