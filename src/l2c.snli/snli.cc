@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
   unsigned max_iter = conf["max_iter"].as<unsigned>();
   for (unsigned i = 0; i < max_iter; ++i) {
     unsigned sid = orders[i];
-    SNLIInstance & inst = corpus.training_instances[sid];
+    // SNLIInstance & inst = corpus.training_instances[sid];
 
     // engine.reinforce(inst);
   }

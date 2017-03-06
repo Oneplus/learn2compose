@@ -16,7 +16,8 @@ void init_command_line(int argc, char* argv[], po::variables_map& conf) {
   general_opt.add_options()
     ("system", po::value<std::string>()->default_value("cons"), "The type of tree lstm")
     ("policy", po::value<std::string>()->default_value("sample"), "The policy name.")
-    ("objective_sequence", po::value<std::string>()->default_value("sample_both_+"), "The learning method [joint].")
+    ("sentence_model", po::value<std::string>()->default_value("avg"), "The name of the sentence model.")
+    ("objective_sequence", po::value<std::string>()->default_value("sample_both_+"), "The learning method.")
     ("training_data,T", po::value<std::string>(), "The path to the training data.")
     ("embedding,w", po::value<std::string>(), "The path to the embedding file.")
     ("devel_data,d", po::value<std::string>(), "The path to the development data.")
@@ -44,7 +45,7 @@ void init_command_line(int argc, char* argv[], po::variables_map& conf) {
   }
 }
 
-float evaluate(YelpModel & engine,
+float evaluate(YelpAvgPipeL2CModel & engine,
                YelpCorpus & corpus,
                bool devel) {
   unsigned n = devel ? corpus.n_devel : corpus.n_test;
@@ -96,30 +97,47 @@ int main(int argc, char* argv[]) {
   std::string policy_name = conf["policy"].as<std::string>();
   std::string system_name = conf["system"].as<std::string>();
   TransitionSystem * system = get_system(system_name);
-  TreeLSTMStateBuilder * state_builder = get_state_builder(system_name,
-                                                           model,
-                                                           conf["word_dim"].as<unsigned>());
-  YelpModel engine(corpus.word_map.size(),
-                   conf["word_dim"].as<unsigned>(),
-                   conf["hidden_dim"].as<unsigned>(),
-                   corpus.n_classes,
-                   *system,
-                   *state_builder,
-                   embeddings,
-                   policy_name);
-
-  std::string name = "l2c.model.yelp." + system_name + "." + policy_name + "." +
-    boost::lexical_cast<std::string>(portable_getpid());
+  TreeLSTMStateBuilder * state_builder = nullptr;
+  YelpAvgPipeL2CModel * engine = nullptr;
+  if (conf["sentence_model"].as<std::string>() == "avg") {
+    state_builder = get_state_builder(system_name,
+                                      model,
+                                      conf["word_dim"].as<unsigned>());
+    engine = new YelpAvgPipeL2CModel(corpus.word_map.size(),
+                                     conf["word_dim"].as<unsigned>(),
+                                     conf["hidden_dim"].as<unsigned>(),
+                                     corpus.n_classes,
+                                     *system,
+                                     *state_builder,
+                                     embeddings,
+                                     policy_name);
+  } else {
+    state_builder = get_state_builder(system_name,
+                                      model,
+                                      conf["word_dim"].as<unsigned>() * 2);
+    engine = new YelpBiGRUPipeL2CModel(corpus.word_map.size(),
+                                       conf["word_dim"].as<unsigned>(),
+                                       conf["hidden_dim"].as<unsigned>(),
+                                       corpus.n_classes,
+                                       *system,
+                                       *state_builder,
+                                       embeddings,
+                                       policy_name);
+  }
+  std::string objective_sequence = conf["objective_sequence"].as<std::string>();
+  std::string name = "l2c.model.yelp." + system_name +
+    "." + objective_sequence + 
+    "." + boost::lexical_cast<std::string>(portable_getpid());
 
   unsigned max_iter = conf["max_iter"].as<unsigned>();
   float llh = 0.f, llh_in_batch = 0.f;
   float best_dev_p = 0.f, test_p = 0.f;
   unsigned logc = 0;
-  std::string objective_sequence = conf["objective_sequence"].as<std::string>();
+
   std::vector<Model::Param> seq;
   get_objective_sequence(objective_sequence, max_iter, seq);
   for (unsigned iter = 0; iter < max_iter; ++iter) {
-    engine.set_policy(seq[iter].first);
+    engine->set_policy(seq[iter].first);
     llh = 0.f;
     _INFO << "Main:: start of iteration #" << iter << ", objective code=("
       << seq[iter].first << ", " << seq[iter].second << ")";
@@ -128,7 +146,7 @@ int main(int argc, char* argv[]) {
       YelpInstance& inst = corpus.training_instances[sid];
       {
         dynet::ComputationGraph cg;
-        dynet::expr::Expression l = engine.objective(cg, inst, seq[iter].second);
+        dynet::expr::Expression l = engine->objective(cg, inst, seq[iter].second);
         float lp = dynet::as_scalar(cg.forward(l));
         cg.backward(l);
         trainer->update();
@@ -143,22 +161,22 @@ int main(int argc, char* argv[]) {
         llh_in_batch = 0.f;
       }
       if (logc % conf["evaluate_stops"].as<unsigned>() == 0) {
-        float p = evaluate(engine, corpus, true);
+        float p = evaluate(*engine, corpus, true);
         float epoch = (float(logc) / corpus.n_train);
         _INFO << "Main:: iter #" << iter << " (epoch " << epoch << ") dev p: " << p;
         if (p > best_dev_p) {
           best_dev_p = p;
-          test_p = evaluate(engine, corpus, false);
+          test_p = evaluate(*engine, corpus, false);
           _INFO << "Main:: new BEST dev: " << best_dev_p << ", test: " << test_p;
           dynet::save_dynet_model(name, (&model));
         }
       }
     }
-    float p = evaluate(engine, corpus, true);
+    float p = evaluate(*engine, corpus, true);
     _INFO << "Main:: end of iter #" << iter << " loss: " << llh << " dev p: " << p;
     if (p > best_dev_p) {
       best_dev_p = p;
-      test_p = evaluate(engine, corpus, false);
+      test_p = evaluate(*engine, corpus, false);
       _INFO << "Main:: new BEST dev: " << best_dev_p << ", test: " << test_p;
       dynet::save_dynet_model(name, (&model));
     }
