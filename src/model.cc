@@ -127,7 +127,6 @@ dynet::expr::Expression Model::left(dynet::ComputationGraph & cg,
     std::vector<unsigned> valid_actions;
     system.get_valid_actions(state, valid_actions);
     dynet::expr::Expression logits = get_policy_logits(machine);
-    dynet::expr::Expression prob_expr = dynet::expr::softmax(logits);
     unsigned action = system.get_shift();
     if (!system.is_valid(state, action)) { action = system.get_reduce(); }
 

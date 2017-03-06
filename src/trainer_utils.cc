@@ -133,7 +133,8 @@ void get_objective_sequence_parse_one_param(const std::string & expr,
   std::vector<std::string> params;
   boost::algorithm::split(params, expr, boost::is_any_of("_"));
   assert(params.size() == 3);
-  time = boost::lexical_cast<unsigned>(params[2]);
+  if (params[2] == "+") { time = UINT_MAX; }
+  else { time = boost::lexical_cast<unsigned>(params[2]); }
   if (boost::algorithm::to_lower_copy(params[0]) == "right") {
     policy_type = Model::kRight;
   } else if (boost::algorithm::to_lower_copy(params[0]) == "left") {
