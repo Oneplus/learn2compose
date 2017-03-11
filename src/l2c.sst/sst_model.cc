@@ -91,9 +91,10 @@ unsigned SSTModel::predict(const SSTInstance & inst) {
   return std::max_element(pred_score.begin(), pred_score.end()) - pred_score.begin();
 }
 
-dynet::expr::Expression SSTModel::get_policy_logits(TreeLSTMState * machine) {
+dynet::expr::Expression SSTModel::get_policy_logits(TreeLSTMState * machine,
+                                                    const State & state) {
   return policy_scorer.get_output(dynet::expr::rectify(
-    policy_projector.get_output(machine->state_repr()))
+    policy_projector.get_output(machine->state_repr(state)))
   );
 }
 

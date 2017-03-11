@@ -5,7 +5,8 @@
 #include "trainer_utils.h"
 #include "yelp_corpus.h"
 #include "yelp_model.h"
-#include "dynet/init.h"
+#include "dynet/dynet.h"
+#include "dynet/globals.h"
 #if _MSC_VER
 #include <process.h>
 #endif
@@ -99,7 +100,8 @@ int main(int argc, char* argv[]) {
   TransitionSystem * system = get_system(system_name);
   TreeLSTMStateBuilder * state_builder = nullptr;
   YelpAvgPipeL2CModel * engine = nullptr;
-  if (conf["sentence_model"].as<std::string>() == "avg") {
+  std::string sentence_model_name = conf["sentence_model"].as<std::string>();
+  if (sentence_model_name == "avg") {
     state_builder = get_state_builder(system_name,
                                       model,
                                       conf["word_dim"].as<unsigned>());
@@ -111,7 +113,7 @@ int main(int argc, char* argv[]) {
                                      *state_builder,
                                      embeddings,
                                      policy_name);
-  } else {
+  } else if (sentence_model_name == "bigru") {
     state_builder = get_state_builder(system_name,
                                       model,
                                       conf["word_dim"].as<unsigned>() * 2);
@@ -123,6 +125,18 @@ int main(int argc, char* argv[]) {
                                        *state_builder,
                                        embeddings,
                                        policy_name);
+  } else {
+    state_builder = get_state_builder(system_name,
+                                      model,
+                                      conf["word_dim"].as<unsigned>() * 2);
+    engine = new YelpBiGRUPipeL2CModelBatch(corpus.word_map.size(),
+                                            conf["word_dim"].as<unsigned>(),
+                                            conf["hidden_dim"].as<unsigned>(),
+                                            corpus.n_classes,
+                                            *system,
+                                            *state_builder,
+                                            embeddings,
+                                            policy_name);
   }
   std::string objective_sequence = conf["objective_sequence"].as<std::string>();
   std::string name = "l2c.model.yelp." + system_name +

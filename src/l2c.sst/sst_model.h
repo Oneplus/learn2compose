@@ -36,7 +36,8 @@ struct SSTModel : public Model {
 
   unsigned predict(const SSTInstance & inst);
 
-  dynet::expr::Expression get_policy_logits(TreeLSTMState * machine);
+  dynet::expr::Expression get_policy_logits(TreeLSTMState * machine,
+                                            const State & state) override;
 
   dynet::expr::Expression get_classifier_logits(dynet::expr::Expression repr);
 };

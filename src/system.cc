@@ -2,7 +2,7 @@
 #include "logging.h"
 
 
-State::State(unsigned n_) : heads(n_), n(n_), nid(n_), beta(0) {
+State::State(unsigned n_) : heads(n_, UINT_MAX), n(n_), nid(n_), beta(0) {
 }
 
 bool State::is_terminated() const {

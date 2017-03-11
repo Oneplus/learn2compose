@@ -37,7 +37,8 @@ struct YelpAvgPipeL2CModel : public Model {
 
   unsigned predict(const YelpInstance & inst);
 
-  dynet::expr::Expression get_policy_logits(TreeLSTMState * machine);
+  dynet::expr::Expression get_policy_logits(TreeLSTMState * machine,
+                                            const State & state) override;
 
   dynet::expr::Expression get_classifier_logits(dynet::expr::Expression repr);
 
@@ -47,10 +48,6 @@ struct YelpAvgPipeL2CModel : public Model {
 struct YelpBiGRUPipeL2CModel : public YelpAvgPipeL2CModel {
   dynet::GRUBuilder fwd_gru;
   dynet::GRUBuilder bwd_gru;
-  dynet::Parameter p_fwd_guard;
-  dynet::Parameter p_bwd_guard;
-  dynet::expr::Expression fwd_guard;
-  dynet::expr::Expression bwd_guard;
 
   YelpBiGRUPipeL2CModel(unsigned word_size,
                         unsigned word_dim,
@@ -60,6 +57,25 @@ struct YelpBiGRUPipeL2CModel : public YelpAvgPipeL2CModel {
                         TreeLSTMStateBuilder & state_builder,
                         const Embeddings & embeddings,
                         const std::string & policy_name);
+
+  void new_graph(dynet::ComputationGraph & cg);
+
+  dynet::expr::Expression sentence_expr(const YelpInstance & inst, unsigned sid);
+};
+
+struct YelpBiGRUPipeL2CModelBatch : public YelpAvgPipeL2CModel {
+  dynet::GRUBuilder fwd_gru;
+  dynet::GRUBuilder bwd_gru;
+  std::vector<dynet::expr::Expression> sentence_expr_cache;
+
+  YelpBiGRUPipeL2CModelBatch(unsigned word_size,
+                             unsigned word_dim,
+                             unsigned hidden_dim,
+                             unsigned n_classes,
+                             TransitionSystem & system,
+                             TreeLSTMStateBuilder & state_builder,
+                             const Embeddings & embeddings,
+                             const std::string & policy_name);
 
   void new_graph(dynet::ComputationGraph & cg);
 

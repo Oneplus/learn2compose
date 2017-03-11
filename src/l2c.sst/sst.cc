@@ -6,6 +6,7 @@
 #include "sst_corpus.h"
 #include "sst_model.h"
 #include "dynet/init.h"
+#include "dynet/globals.h"
 #if _MSC_VER
 #include <process.h>
 #endif
