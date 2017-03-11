@@ -32,6 +32,7 @@ struct SymbolEmbedding : public LayerI {
                   bool trainable=true);
   void new_graph(dynet::ComputationGraph& cg) override;
   dynet::expr::Expression embed(unsigned label_id);
+  dynet::expr::Expression embed(const std::vector<unsigned> & label_ids);
 };
 
 struct BinnedDistanceEmbedding : public LayerI {

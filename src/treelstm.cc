@@ -63,7 +63,7 @@ void ConstituentTreeLSTMState::new_graph(dynet::ComputationGraph & cg) {
   treelstm_model.new_graph(cg);
 }
 
-dynet::expr::Expression ConstituentTreeLSTMState::state_repr() {
+dynet::expr::Expression ConstituentTreeLSTMState::state_repr(const State & state) {
   unsigned stack_size = stack.size();
   unsigned buffer_size = buffer.size();
   return dynet::expr::concatenate({
@@ -73,7 +73,7 @@ dynet::expr::Expression ConstituentTreeLSTMState::state_repr() {
   });
 }
 
-dynet::expr::Expression ConstituentTreeLSTMState::final_repr() {
+dynet::expr::Expression ConstituentTreeLSTMState::final_repr(const State & state) {
   return stack.back().first;
 }
 
@@ -119,8 +119,7 @@ DependencyTreeLSTMModel::DependencyTreeLSTMModel(dynet::Model & m,
                                                  unsigned word_dim) :
   input_gate(m, word_dim, word_dim, word_dim),
   output_gate(m, word_dim, word_dim, word_dim),
-  left_forget_gate(m, word_dim, word_dim, word_dim),
-  right_forget_gate(m, word_dim, word_dim, word_dim),
+  forget_gate(m, word_dim, word_dim, word_dim),
   rnn_cell(m, word_dim, word_dim, word_dim),
   p_sigma_guard_j(m.add_parameters({ word_dim })),
   p_sigma_guard_i(m.add_parameters({ word_dim })),
@@ -131,8 +130,7 @@ DependencyTreeLSTMModel::DependencyTreeLSTMModel(dynet::Model & m,
 void DependencyTreeLSTMModel::new_graph(dynet::ComputationGraph & cg) {
   input_gate.new_graph(cg);
   output_gate.new_graph(cg);
-  left_forget_gate.new_graph(cg);
-  right_forget_gate.new_graph(cg);
+  forget_gate.new_graph(cg);
   rnn_cell.new_graph(cg);
   zero_padding = dynet::expr::zeroes(cg, { word_dim });
   sigma_guard_j = dynet::expr::parameter(cg, p_sigma_guard_j);
@@ -141,7 +139,7 @@ void DependencyTreeLSTMModel::new_graph(dynet::ComputationGraph & cg) {
 }
 
 DependencyTreeLSTMState::DependencyTreeLSTMState(DependencyTreeLSTMModel & treelstm_model) 
-  : beta(0), treelstm_model(treelstm_model) {
+  : treelstm_model(treelstm_model) {
 }
 
 void DependencyTreeLSTMState::initialize(const std::vector<dynet::expr::Expression>& input) {
@@ -153,47 +151,68 @@ void DependencyTreeLSTMState::new_graph(dynet::ComputationGraph & cg) {
   treelstm_model.new_graph(cg);
 }
 
-dynet::expr::Expression DependencyTreeLSTMState::state_repr() {
-  unsigned stack_size = stack.size();
+dynet::expr::Expression DependencyTreeLSTMState::state_repr(const State & state) {
+  unsigned stack_size = state.sigma.size();
   unsigned buffer_size = buffer.size();
   return dynet::expr::concatenate({
-    stack_size > 1 ? stack[stack_size - 2].first : treelstm_model.sigma_guard_i,
-    stack_size > 0 ? stack.back().first : treelstm_model.sigma_guard_j,
-    beta < buffer_size ? buffer[beta] : treelstm_model.beta_guard
+    stack_size > 1 ? buffer[state.sigma[stack_size - 2]] : treelstm_model.sigma_guard_i,
+    stack_size > 0 ? buffer[state.sigma.back()] : treelstm_model.sigma_guard_j,
+    state.beta < buffer_size ? buffer[state.beta] : treelstm_model.beta_guard
   });
 }
 
-dynet::expr::Expression DependencyTreeLSTMState::final_repr() {
-  return stack.back().first;
+dynet::expr::Expression DependencyTreeLSTMState::final_repr(const State & state) {
+  unsigned n_words = buffer.size();
+  unsigned root = UINT_MAX;
+  std::vector<std::vector<unsigned>> tree(n_words);
+  for (unsigned i = 0; i < n_words; ++i) {
+    unsigned hed = state.heads[i];
+    if (hed == UINT_MAX) { BOOST_ASSERT(root == UINT_MAX); root = i; } else { tree[hed].push_back(i); }
+  }
+  BOOST_ASSERT(root != UINT_MAX);
+  return dynet::expr::Expression();
+}
+
+TreeLSTMState::TreeLSTMCell2 DependencyTreeLSTMState::final_repr_recursive(
+  const std::vector<std::vector<unsigned>>& tree,
+  unsigned now) {
+
+  unsigned n_children = tree[now].size();
+  if (n_children == 0) { /* leaf */
+    return std::make_pair(buffer[now], treelstm_model.zero_padding);
+  }
+  
+  std::vector<dynet::expr::Expression> h_(n_children);
+  std::vector<dynet::expr::Expression> c_(n_children);
+  for (unsigned k = 0; k < n_children; ++k) {
+    unsigned c = tree[now][k];
+    auto payload = final_repr_recursive(tree, c);
+    h_[k] = payload.first;
+    c_[k] = payload.second;
+  }
+
+  dynet::expr::Expression x_j = buffer[now];
+  dynet::expr::Expression h_sum = dynet::expr::sum(h_);
+  dynet::expr::Expression i_j = dynet::expr::logistic(treelstm_model.input_gate.get_output(x_j, h_sum));
+
+  std::vector<dynet::expr::Expression> f_j_(n_children);
+  for (unsigned k = 0; k < n_children; ++k) {
+    f_j_[k] = dynet::expr::logistic(treelstm_model.forget_gate.get_output(x_j, h_[k]));
+  }
+
+  dynet::expr::Expression o_j = dynet::expr::logistic(treelstm_model.output_gate.get_output(x_j, h_sum));
+  dynet::expr::Expression u_j = dynet::expr::tanh(treelstm_model.rnn_cell.get_output(x_j, h_sum));
+  std::vector<dynet::expr::Expression> c_j_(n_children);
+  for (unsigned k = 0; k < n_children; ++k) {
+    c_j_[k] = dynet::expr::cmult(f_j_[k], c_[k]);
+  }
+  dynet::expr::Expression c = dynet::expr::cmult(i_j, u_j) + dynet::expr::sum(c_j_);
+  dynet::expr::Expression h = dynet::expr::cmult(o_j, dynet::expr::tanh(c));
+  return std::make_pair(h, c);
 }
 
 void DependencyTreeLSTMState::perform_action(const unsigned & action) {
-  if (DependencySystem::is_shift(action)) {
-    stack.push_back(std::make_pair(buffer[beta], treelstm_model.zero_padding));
-    beta++;
-  } else if (DependencySystem::is_left(action)) {
-    auto cell = compose2(stack[stack.size() - 2],
-                         stack.back(),
-                         treelstm_model.input_gate,
-                         treelstm_model.output_gate,
-                         treelstm_model.left_forget_gate,
-                         treelstm_model.right_forget_gate,
-                         treelstm_model.rnn_cell);
-    stack.pop_back();
-    stack.pop_back();
-    stack.push_back(cell);
-  } else {
-    auto cell = compose2(stack.back(),
-                         stack[stack.size() - 2],
-                         treelstm_model.input_gate,
-                         treelstm_model.output_gate,
-                         treelstm_model.left_forget_gate,
-                         treelstm_model.right_forget_gate,
-                         treelstm_model.rnn_cell);
-    stack.pop_back();
-    stack.pop_back();
-    stack.push_back(cell);
-  }
+  // not need to do anything.
 }
 
 DependencyTreeLSTMStateBuilder::DependencyTreeLSTMStateBuilder(dynet::Model & m,

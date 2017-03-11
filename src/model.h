@@ -49,7 +49,8 @@ struct Model {
 
   void set_policy(const POLICY_TYPE & policy_type_);
 
-  virtual dynet::expr::Expression get_policy_logits(TreeLSTMState * machine) = 0;
+  virtual dynet::expr::Expression get_policy_logits(TreeLSTMState * machine,
+                                                    const State & state) = 0;
 };
 
 #endif  //  end for MODEL_H

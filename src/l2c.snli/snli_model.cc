@@ -1,5 +1,6 @@
 #include "snli_model.h"
 #include "system.h"
+#include "dynet/globals.h"
 
 SNLIModel::SNLIModel(unsigned word_size,
                      unsigned word_dim,
@@ -73,7 +74,7 @@ dynet::expr::Expression SNLIModel::rollin(dynet::ComputationGraph & cg,
   while (!state.is_terminated()) {
     std::vector<unsigned> valid_actions;
     system.get_valid_actions(state, valid_actions);
-    dynet::expr::Expression logits = get_policy_logits(machine);
+    dynet::expr::Expression logits = get_policy_logits(machine, state);
     dynet::expr::Expression prob_expr = dynet::expr::softmax(logits);
     unsigned action = 0;
     if (policy_type == kSample) {
@@ -95,7 +96,7 @@ dynet::expr::Expression SNLIModel::rollin(dynet::ComputationGraph & cg,
     machine->perform_action(action);
     transition_probs.push_back(dynet::expr::pick(prob_expr, action));
   }
-  dynet::expr::Expression ret = machine->final_repr();
+  dynet::expr::Expression ret = machine->final_repr(state);
   delete machine;
   return ret;
 }
@@ -116,7 +117,7 @@ dynet::expr::Expression SNLIModel::decode(dynet::ComputationGraph & cg,
   while (!state.is_terminated()) {
     std::vector<unsigned> valid_actions;
     system.get_valid_actions(state, valid_actions);
-    dynet::expr::Expression logits = get_policy_logits(machine);
+    dynet::expr::Expression logits = get_policy_logits(machine, state);
     unsigned action = 0;
     if (policy_type == kSample) {
       std::vector<float> prob = dynet::as_vector(cg.get_value(logits));
@@ -133,7 +134,7 @@ dynet::expr::Expression SNLIModel::decode(dynet::ComputationGraph & cg,
     system.perform_action(state, action);
     machine->perform_action(action);
   }
-  dynet::expr::Expression ret = machine->final_repr();
+  dynet::expr::Expression ret = machine->final_repr(state);
   delete machine;
   return ret;
 }
@@ -158,8 +159,9 @@ dynet::expr::Expression SNLIModel::get_classifier_logits(dynet::expr::Expression
     dynet::expr::rectify(classifier_merger.get_output(s1, s2, u, v)));
 }
 
-dynet::expr::Expression SNLIModel::get_policy_logits(TreeLSTMState * machine) {
+dynet::expr::Expression SNLIModel::get_policy_logits(TreeLSTMState * machine,
+                                                     const State & state) {
   return policy_scorer.get_output(dynet::expr::rectify(
-    policy_projector.get_output(machine->state_repr()))
+    policy_projector.get_output(machine->state_repr(state)))
   );
 }

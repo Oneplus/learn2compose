@@ -35,8 +35,8 @@ struct TreeLSTMState {
   virtual ~TreeLSTMState() {}
   virtual void initialize(const std::vector<dynet::expr::Expression> & input) = 0;
   virtual void new_graph(dynet::ComputationGraph & cg) = 0;
-  virtual dynet::expr::Expression state_repr() = 0;
-  virtual dynet::expr::Expression final_repr() = 0;
+  virtual dynet::expr::Expression state_repr(const State & state) = 0;
+  virtual dynet::expr::Expression final_repr(const State & state) = 0;
   virtual void perform_action(const unsigned & action) = 0;
 };
 
@@ -80,8 +80,8 @@ struct ConstituentTreeLSTMState : public TreeLSTMState {
   ConstituentTreeLSTMState(ConstituentTreeLSTMModel & treelstm_model);
   void initialize(const std::vector<dynet::expr::Expression> & input);
   void new_graph(dynet::ComputationGraph & cg) override;
-  dynet::expr::Expression state_repr() override;
-  dynet::expr::Expression final_repr() override;
+  dynet::expr::Expression state_repr(const State & state) override;
+  dynet::expr::Expression final_repr(const State & state) override;
   void perform_action(const unsigned & action) override;
 };
 
@@ -97,8 +97,7 @@ struct ConstituentTreeLSTMStateBuilder : public TreeLSTMStateBuilder {
 struct DependencyTreeLSTMModel : public TreeLSTMModel {
   Merge2Layer input_gate;
   Merge2Layer output_gate;
-  Merge2Layer left_forget_gate;
-  Merge2Layer right_forget_gate;
+  Merge2Layer forget_gate;
   Merge2Layer rnn_cell;
   dynet::expr::Expression zero_padding;
   dynet::Parameter p_sigma_guard_j;
@@ -114,17 +113,15 @@ struct DependencyTreeLSTMModel : public TreeLSTMModel {
 };
 
 struct DependencyTreeLSTMState : public TreeLSTMState {
-  typedef std::pair<dynet::expr::Expression, dynet::expr::Expression> TreeLSTMCell;
-  std::vector<TreeLSTMCell2> stack;
   std::vector<dynet::expr::Expression> buffer;
-  unsigned beta;
   DependencyTreeLSTMModel & treelstm_model;
 
   DependencyTreeLSTMState(DependencyTreeLSTMModel & treelstm_model);
   void initialize(const std::vector<dynet::expr::Expression> & input);
   void new_graph(dynet::ComputationGraph & cg) override;
-  dynet::expr::Expression state_repr() override;
-  dynet::expr::Expression final_repr() override;
+  dynet::expr::Expression state_repr(const State & state) override;
+  dynet::expr::Expression final_repr(const State & state) override;
+  TreeLSTMCell2 final_repr_recursive(const std::vector<std::vector<unsigned>>& tree, unsigned now);
   void perform_action(const unsigned & action) override;
 };
 

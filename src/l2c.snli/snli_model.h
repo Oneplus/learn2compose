@@ -45,7 +45,8 @@ struct SNLIModel {
 
   unsigned predict(const SNLIInstance & inst);
 
-  dynet::expr::Expression get_policy_logits(TreeLSTMState * machine);
+  dynet::expr::Expression get_policy_logits(TreeLSTMState * machine,
+                                            const State & state);
 
   dynet::expr::Expression get_classifier_logits(dynet::expr::Expression & s1,
                                                 dynet::expr::Expression & s2);

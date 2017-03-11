@@ -18,6 +18,12 @@ dynet::expr::Expression SymbolEmbedding::embed(unsigned label_id) {
           dynet::expr::const_lookup((*cg), p_labels, label_id));
 }
 
+dynet::expr::Expression SymbolEmbedding::embed(const std::vector<unsigned>& label_ids) {
+  return (trainable ?
+          dynet::expr::lookup((*cg), p_labels, label_ids) :
+          dynet::expr::const_lookup((*cg), p_labels, label_ids));
+}
+
 BinnedDistanceEmbedding::BinnedDistanceEmbedding(dynet::Model& m,
                                                  unsigned dim,
                                                  unsigned n_bins,
