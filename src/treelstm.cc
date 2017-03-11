@@ -170,7 +170,8 @@ dynet::expr::Expression DependencyTreeLSTMState::final_repr(const State & state)
     if (hed == UINT_MAX) { BOOST_ASSERT(root == UINT_MAX); root = i; } else { tree[hed].push_back(i); }
   }
   BOOST_ASSERT(root != UINT_MAX);
-  return dynet::expr::Expression();
+  TreeLSTMCell2 cell = final_repr_recursive(tree, root);
+  return cell.first;
 }
 
 TreeLSTMState::TreeLSTMCell2 DependencyTreeLSTMState::final_repr_recursive(
