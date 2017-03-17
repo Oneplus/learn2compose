@@ -21,9 +21,11 @@ struct YelpCorpus : public Corpus {
   YelpCorpus();
 
   void load_training_data(const std::string& filename);
+  void load_training_data(const std::string& filename, bool allow_new_token);
   void load_devel_data(const std::string& filename);
   void load_test_data(const std::string& filename);
-  void parse_data(const std::string& data, YelpInstance & inst, bool train);
+  void parse_data(const std::string& data, YelpInstance & inst,
+                  bool allow_new_token, bool allow_new_class);
 };
 
 #endif  //  end for SST_CORPUS_H

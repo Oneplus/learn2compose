@@ -52,9 +52,8 @@ dynet::expr::Expression Model::reinforce(dynet::ComputationGraph & cg,
 
 dynet::expr::Expression Model::decode(dynet::ComputationGraph & cg,
                                       const std::vector<dynet::expr::Expression>& input,
-                                      std::vector<dynet::expr::Expression>& probs) {
-  unsigned len = input.size();
-  State state(len);
+                                      std::vector<dynet::expr::Expression>& probs,
+                                      State & state) {
   TreeLSTMState * machine = state_builder.build();
   machine->new_graph(cg);
   machine->initialize(input);
@@ -85,9 +84,8 @@ dynet::expr::Expression Model::decode(dynet::ComputationGraph & cg,
 }
 
 dynet::expr::Expression Model::decode(dynet::ComputationGraph & cg,
-                                      const std::vector<dynet::expr::Expression>& input) {
-  unsigned len = input.size();
-  State state(len);
+                                      const std::vector<dynet::expr::Expression>& input,
+                                      State & state) {
   TreeLSTMState * machine = state_builder.build();
   machine->new_graph(cg);
   machine->initialize(input);
@@ -116,10 +114,86 @@ dynet::expr::Expression Model::decode(dynet::ComputationGraph & cg,
   return ret;
 }
 
+dynet::expr::Expression Model::decode(dynet::ComputationGraph & cg,
+                                      const std::vector<dynet::expr::Expression>& input,
+                                      std::vector<dynet::expr::Expression>& probs) {
+  unsigned len = input.size();
+  State state(len);
+  return decode(cg, input, probs, state);
+}
+
+dynet::expr::Expression Model::decode(dynet::ComputationGraph & cg,
+                                      const std::vector<dynet::expr::Expression>& input) {
+  unsigned len = input.size();
+  State state(len);
+  return decode(cg, input, state);
+}
+
+dynet::expr::Expression Model::left(dynet::ComputationGraph & cg,
+                                    const std::vector<dynet::expr::Expression>& input,
+                                    State & state) {
+  TreeLSTMState * machine = state_builder.build();
+  machine->new_graph(cg);
+  machine->initialize(input);
+
+  while (!state.is_terminated()) {
+    std::vector<unsigned> valid_actions;
+    system.get_valid_actions(state, valid_actions);
+    unsigned action = system.get_shift();
+    if (!system.is_valid(state, action)) { action = system.get_reduce(); }
+    system.perform_action(state, action);
+    machine->perform_action(action);
+  }
+
+  dynet::expr::Expression ret = machine->final_repr(state);
+  delete machine;
+  return ret;
+}
+
+dynet::expr::Expression Model::left(dynet::ComputationGraph & cg,
+                                    const std::vector<dynet::expr::Expression>& input,
+                                    std::vector<dynet::expr::Expression>& probs,
+                                    State & state) {
+  TreeLSTMState * machine = state_builder.build();
+  machine->new_graph(cg);
+  machine->initialize(input);
+
+  while (!state.is_terminated()) {
+    std::vector<unsigned> valid_actions;
+    system.get_valid_actions(state, valid_actions);
+    dynet::expr::Expression logits = get_policy_logits(machine, state);
+    dynet::expr::Expression prob_expr = dynet::expr::softmax(logits);
+
+    unsigned action = system.get_shift();
+    if (!system.is_valid(state, action)) { action = system.get_reduce(); }
+    system.perform_action(state, action);
+    machine->perform_action(action);
+    probs.push_back(dynet::expr::pick(prob_expr, action));
+  }
+
+  dynet::expr::Expression ret = machine->final_repr(state);
+  delete machine;
+  return ret;
+}
+
 dynet::expr::Expression Model::left(dynet::ComputationGraph & cg, 
                                     const std::vector<dynet::expr::Expression>& input) {
   unsigned len = input.size();
   State state(len);
+  return left(cg, input, state);
+}
+
+dynet::expr::Expression Model::left(dynet::ComputationGraph & cg,
+                                    const std::vector<dynet::expr::Expression>& input,
+                                    std::vector<dynet::expr::Expression> & probs) {
+  unsigned len = input.size();
+  State state(len);
+  return left(cg, input, probs, state);
+}
+
+dynet::expr::Expression Model::right(dynet::ComputationGraph & cg, 
+                                     const std::vector<dynet::expr::Expression>& input,
+                                     State & state) {
   TreeLSTMState * machine = state_builder.build();
   machine->new_graph(cg);
   machine->initialize(input);
@@ -139,11 +213,10 @@ dynet::expr::Expression Model::left(dynet::ComputationGraph & cg,
   return ret;
 }
 
-dynet::expr::Expression Model::left(dynet::ComputationGraph & cg,
-                                    const std::vector<dynet::expr::Expression>& input,
-                                    std::vector<dynet::expr::Expression> & probs) {
-  unsigned len = input.size();
-  State state(len);
+dynet::expr::Expression Model::right(dynet::ComputationGraph & cg,
+                                     const std::vector<dynet::expr::Expression>& input,
+                                     std::vector<dynet::expr::Expression>& probs,
+                                     State & state) {
   TreeLSTMState * machine = state_builder.build();
   machine->new_graph(cg);
   machine->initialize(input);
@@ -170,23 +243,7 @@ dynet::expr::Expression Model::right(dynet::ComputationGraph & cg,
                                      const std::vector<dynet::expr::Expression>& input) {
   unsigned len = input.size();
   State state(len);
-  TreeLSTMState * machine = state_builder.build();
-  machine->new_graph(cg);
-  machine->initialize(input);
-
-  while (!state.is_terminated()) {
-    std::vector<unsigned> valid_actions;
-    system.get_valid_actions(state, valid_actions);
-    unsigned action = system.get_shift();
-    if (!system.is_valid(state, action)) { action = system.get_reduce(); }
-
-    system.perform_action(state, action);
-    machine->perform_action(action);
-  }
-
-  dynet::expr::Expression ret = machine->final_repr(state);
-  delete machine;
-  return ret;
+  return right(cg, input, state);
 }
 
 dynet::expr::Expression Model::right(dynet::ComputationGraph & cg,
@@ -194,26 +251,7 @@ dynet::expr::Expression Model::right(dynet::ComputationGraph & cg,
                                      std::vector<dynet::expr::Expression> & probs) {
   unsigned len = input.size();
   State state(len);
-  TreeLSTMState * machine = state_builder.build();
-  machine->new_graph(cg);
-  machine->initialize(input);
-
-  while (!state.is_terminated()) {
-    std::vector<unsigned> valid_actions;
-    system.get_valid_actions(state, valid_actions);
-    dynet::expr::Expression logits = get_policy_logits(machine, state);
-    dynet::expr::Expression prob_expr = dynet::expr::softmax(logits);
-    unsigned action = system.get_shift();
-    if (!system.is_valid(state, action)) { action = system.get_reduce(); }
-
-    system.perform_action(state, action);
-    machine->perform_action(action);
-    probs.push_back(dynet::expr::pick(prob_expr, action));
-  }
-
-  dynet::expr::Expression ret = machine->final_repr(state);
-  delete machine;
-  return ret;
+  return right(cg, input, probs, state);
 }
 
 void Model::set_policy(const std::string & policy_name) {

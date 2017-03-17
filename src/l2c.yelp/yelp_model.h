@@ -27,7 +27,8 @@ struct YelpAvgPipeL2CModel : public Model {
                       TransitionSystem & system,
                       TreeLSTMStateBuilder & state_builder,
                       const Embeddings & embeddings,
-                      const std::string & policy_name);
+                      const std::string & policy_name,
+                      bool tune_embedding);
 
   virtual void new_graph(dynet::ComputationGraph & cg);
 
@@ -36,6 +37,8 @@ struct YelpAvgPipeL2CModel : public Model {
                                     OBJECTIVE_TYPE objective_type = Model::kBothPolicyAndReward);
 
   unsigned predict(const YelpInstance & inst);
+
+  unsigned predict(const YelpInstance & inst, State & state);
 
   dynet::expr::Expression get_policy_logits(TreeLSTMState * machine,
                                             const State & state) override;
@@ -56,7 +59,8 @@ struct YelpBiGRUPipeL2CModel : public YelpAvgPipeL2CModel {
                         TransitionSystem & system,
                         TreeLSTMStateBuilder & state_builder,
                         const Embeddings & embeddings,
-                        const std::string & policy_name);
+                        const std::string & policy_name,
+                        bool tune_embedding);
 
   void new_graph(dynet::ComputationGraph & cg);
 
@@ -75,7 +79,8 @@ struct YelpBiGRUPipeL2CModelBatch : public YelpAvgPipeL2CModel {
                              TransitionSystem & system,
                              TreeLSTMStateBuilder & state_builder,
                              const Embeddings & embeddings,
-                             const std::string & policy_name);
+                             const std::string & policy_name,
+                             bool tune_embedding);
 
   void new_graph(dynet::ComputationGraph & cg);
 

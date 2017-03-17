@@ -7,13 +7,14 @@ YelpAvgPipeL2CModel::YelpAvgPipeL2CModel(unsigned word_size,
                                          TransitionSystem & system,
                                          TreeLSTMStateBuilder & state_builder,
                                          const Embeddings & embeddings,
-                                         const std::string & policy_name) :
+                                         const std::string & policy_name,
+                                         bool tune_embedding) :
   Model(system, state_builder, policy_name),
   policy_projector(state_builder.m, state_builder.state_repr_dim(), hidden_dim),
   policy_scorer(state_builder.m, hidden_dim, system.num_actions()),
   classifier_projector(state_builder.m, state_builder.final_repr_dim(), hidden_dim),
   classifier_scorer(state_builder.m, hidden_dim, n_classes),
-  word_emb(state_builder.m, word_size, word_dim, false),
+  word_emb(state_builder.m, word_size, word_dim, tune_embedding),
   n_actions(system.num_actions()),
   n_classes(n_classes),
   word_dim(word_dim) {
@@ -93,6 +94,27 @@ unsigned YelpAvgPipeL2CModel::predict(const YelpInstance & inst) {
   return std::max_element(pred_score.begin(), pred_score.end()) - pred_score.begin();
 }
 
+unsigned YelpAvgPipeL2CModel::predict(const YelpInstance & inst, State & state) {
+  dynet::ComputationGraph cg;
+  new_graph(cg);
+  unsigned len = inst.document.size();
+  std::vector<dynet::expr::Expression> input(len);
+  for (unsigned i = 0; i < len; ++i) { input[i] = sentence_expr(inst, i); }
+
+  dynet::expr::Expression final_repr;
+  if (policy_type == kSample) {
+    final_repr = decode(cg, input, state);
+  } else if (policy_type == kLeft) {
+    final_repr = left(cg, input, state);
+  } else {
+    final_repr = right(cg, input, state);
+  }
+
+  dynet::expr::Expression pred_expr = get_classifier_logits(final_repr);
+  std::vector<float> pred_score = dynet::as_vector(cg.get_value(pred_expr));
+  return std::max_element(pred_score.begin(), pred_score.end()) - pred_score.begin();
+}
+
 dynet::expr::Expression YelpAvgPipeL2CModel::get_policy_logits(TreeLSTMState * machine,
                                                                const State & state) {
   return policy_scorer.get_output(dynet::expr::rectify(
@@ -120,9 +142,10 @@ YelpBiGRUPipeL2CModel::YelpBiGRUPipeL2CModel(unsigned word_size,
                                              TransitionSystem & system,
                                              TreeLSTMStateBuilder & state_builder,
                                              const Embeddings & embeddings,
-                                             const std::string & policy_name) :
+                                             const std::string & policy_name,
+                                             bool tune_embedding) :
   YelpAvgPipeL2CModel(word_size, word_dim, hidden_dim, n_classes, system,
-                      state_builder, embeddings, policy_name),
+                      state_builder, embeddings, policy_name, tune_embedding),
   fwd_gru(1, word_dim, word_dim, state_builder.m),
   bwd_gru(1, word_dim, word_dim, state_builder.m) {
 }
@@ -153,9 +176,10 @@ YelpBiGRUPipeL2CModelBatch::YelpBiGRUPipeL2CModelBatch(unsigned word_size,
                                                        TransitionSystem & system,
                                                        TreeLSTMStateBuilder & state_builder,
                                                        const Embeddings & embeddings,
-                                                       const std::string & policy_name) :
+                                                       const std::string & policy_name,
+                                                       bool tune_embedding) :
   YelpAvgPipeL2CModel(word_size, word_dim, hidden_dim, n_classes, system,
-                      state_builder, embeddings, policy_name),
+                      state_builder, embeddings, policy_name, tune_embedding),
   fwd_gru(1, word_dim, word_dim, state_builder.m),
   bwd_gru(1, word_dim, word_dim, state_builder.m) {
 }

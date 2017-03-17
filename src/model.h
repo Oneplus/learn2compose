@@ -26,10 +26,28 @@ struct Model {
 
   dynet::expr::Expression decode(dynet::ComputationGraph & cg,
                                  const std::vector<dynet::expr::Expression> & input,
+                                 std::vector<dynet::expr::Expression> & probs,
+                                 State & state);
+
+  dynet::expr::Expression decode(dynet::ComputationGraph & cg,
+                                 const std::vector<dynet::expr::Expression> & input,
+                                 State & state);
+
+  dynet::expr::Expression decode(dynet::ComputationGraph & cg,
+                                 const std::vector<dynet::expr::Expression> & input,
                                  std::vector<dynet::expr::Expression> & probs);
 
   dynet::expr::Expression decode(dynet::ComputationGraph & cg,
                                  const std::vector<dynet::expr::Expression> & input);
+
+  dynet::expr::Expression left(dynet::ComputationGraph & cg,
+                               const std::vector<dynet::expr::Expression> & input,
+                               State & state);
+
+  dynet::expr::Expression left(dynet::ComputationGraph & cg,
+                               const std::vector<dynet::expr::Expression> & input,
+                               std::vector<dynet::expr::Expression> & probs,
+                               State & state);
 
   dynet::expr::Expression left(dynet::ComputationGraph & cg,
                                const std::vector<dynet::expr::Expression> & input);
@@ -37,6 +55,15 @@ struct Model {
   dynet::expr::Expression left(dynet::ComputationGraph & cg,
                                const std::vector<dynet::expr::Expression> & input,
                                std::vector<dynet::expr::Expression> & probs);
+
+  dynet::expr::Expression right(dynet::ComputationGraph & cg,
+                                const std::vector<dynet::expr::Expression> & input,
+                                State & state);
+
+  dynet::expr::Expression right(dynet::ComputationGraph & cg,
+                                const std::vector<dynet::expr::Expression> & input,
+                                std::vector<dynet::expr::Expression> & probs,
+                                State & state);
 
   dynet::expr::Expression right(dynet::ComputationGraph & cg,
                                 const std::vector<dynet::expr::Expression> & input);

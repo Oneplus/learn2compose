@@ -9,6 +9,7 @@ struct State {
 
   std::vector<unsigned> sigma;
   std::vector<unsigned> heads;
+  std::vector<std::pair<unsigned, unsigned>> pst;
   unsigned n;
   unsigned nid;
   unsigned beta;
@@ -23,6 +24,7 @@ struct TransitionSystem {
   virtual void perform_action(State & state, const unsigned & action) = 0;
   virtual unsigned get_shift() = 0;
   virtual unsigned get_reduce() = 0;
+  virtual void print_tree(const State & stat, std::ostream & os) = 0;
 };
 
 struct ConstituentSystem : public TransitionSystem {
@@ -32,6 +34,9 @@ struct ConstituentSystem : public TransitionSystem {
   bool is_valid(const State & state, const unsigned & action) override;
   unsigned get_shift() override { return 0; }
   unsigned get_reduce() override { return 1; }
+  void print_tree(const State & stat, std::ostream & os) override;
+  void _print_tree(const std::vector<std::pair<unsigned, unsigned>> & pst, unsigned now, std::ostream & os);
+
   static bool is_shift(const unsigned& action) { return action == 0; }
   static bool is_reduce(const unsigned& action) { return action == 1; }
 
@@ -49,6 +54,12 @@ struct DependencySystem : public TransitionSystem {
   bool is_valid(const State & state, const unsigned & action) override;
   unsigned get_shift() override { return 0; }
   unsigned get_reduce() override { return 1; }
+  void print_tree(const State & state, std::ostream & os) override;
+  unsigned _print_tree_get_depth(const std::vector<std::vector<unsigned>> & tree, unsigned now);
+  void _print_tree(const std::vector<std::vector<unsigned>> & tree,
+                   unsigned now,
+                   unsigned horizon_offset,
+                   std::vector<std::string> & canvas);
 
   static bool is_shift(const unsigned & action) { return action == 0; }
   static bool is_left(const unsigned & action) { return action == 1; }
