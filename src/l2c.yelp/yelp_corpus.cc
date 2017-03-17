@@ -51,22 +51,24 @@ void YelpCorpus::load_training_data(const std::string& filename, bool allow_new_
   BOOST_ASSERT_MSG(in, "Corpus:: failed to open the training file.");
 
   n_train = 0;
+  unsigned n_block = 0;
   std::string data = "";
   std::string line;
   while (std::getline(in, line)) {
     boost::algorithm::trim(line);
     if (line.size() == 0) {
       // end for an instance.
-      parse_data(data, training_instances[n_train], allow_new_token, true);
+      if (parse_data(data, training_instances[n_train], allow_new_token, true)) {
+        ++n_train;
+      } else { _ERROR << "failed to load: " << n_block; }
+      ++n_block;
       data = "";
-      ++n_train;
     } else {
       data += (line + "\n");
     }
   }
   if (data.size() > 0) {
-    parse_data(data, training_instances[n_train], allow_new_token, true);
-    ++n_train;
+    if (parse_data(data, training_instances[n_train], allow_new_token, true)) { ++n_train; }
   }
 
   _INFO << "Corpus:: loaded " << n_train << " training sentences.";
@@ -82,22 +84,24 @@ void YelpCorpus::load_devel_data(const std::string& filename) {
   BOOST_ASSERT_MSG(in, "Corpus:: failed to open the devel file.");
 
   n_devel = 0;
+  unsigned n_block = 0;
   std::string data = "";
   std::string line;
   while (std::getline(in, line)) {
     boost::algorithm::trim(line);
     if (line.size() == 0) {
       // end for an instance.
-      parse_data(data, devel_instances[n_devel], false, false);
+      if (parse_data(data, devel_instances[n_devel], false, false)) { ++n_devel; }
+      else { _ERROR << "devel failed to load block: " << n_block; }
+      ++n_block;
       data = "";
-      ++n_devel;
     } else {
       data += (line + "\n");
     }
   }
   if (data.size() > 0) {
-    parse_data(data, devel_instances[n_devel], false, false);
-    ++n_devel;
+    if (parse_data(data, devel_instances[n_devel], false, false)) { ++n_devel; }
+    else { _ERROR << "devel failed to load block: " << n_block; }
   }
 
   _INFO << "Corpus:: loaded " << n_devel << " development sentences.";
@@ -113,29 +117,31 @@ void YelpCorpus::load_test_data(const std::string& filename) {
   BOOST_ASSERT_MSG(in, "Corpus:: failed to open the devel file.");
 
   n_test = 0;
+  unsigned n_block = 0;
   std::string data = "";
   std::string line;
   while (std::getline(in, line)) {
     boost::algorithm::trim(line);
     if (line.size() == 0) {
       // end for an instance.
-      parse_data(data, test_instances[n_test], false, false);
+      if (parse_data(data, test_instances[n_test], false, false)) { ++n_test; }
+      else { _ERROR << "devel failed to load block: " << n_block; }
+      ++n_block;
       data = "";
-      ++n_test;
     } else {
       data += (line + "\n");
     }
   }
   if (data.size() > 0) {
-    parse_data(data, test_instances[n_test], false, false);
-    ++n_test;
+    if (parse_data(data, test_instances[n_test], false, false)) { ++n_test; }
+    else { _ERROR << "devel failed to load block: " << n_block; }
   }
 
   _INFO << "Corpus:: loaded " << n_test << " test sentences.";
   _INFO << "Corpus:: # word in alphabet is " << word_map.size() << " after loading test.";
 }
 
-void YelpCorpus::parse_data(const std::string& data, YelpInstance& input,
+bool YelpCorpus::parse_data(const std::string& data, YelpInstance& input,
                             bool allow_new_token, bool allow_new_class) {
   // json format.
   std::stringstream S(data);
@@ -165,4 +171,9 @@ void YelpCorpus::parse_data(const std::string& data, YelpInstance& input,
     }
     input.document.push_back(sentence);
   }
+  if (input.document.size() == 0) {
+    _ERROR << "empty document assert!";
+    return false;
+  }
+  return true;
 }
