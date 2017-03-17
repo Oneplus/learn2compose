@@ -12,6 +12,9 @@ python ./scripts/yelp/unk_dataset_by_vocab.py ./data/yelp/train.sent_tok_lower_u
 python ./scripts/yelp/unk_dataset_by_vocab.py ./data/yelp/train.sent_tok_lower_unk5.dat.train.vocab ./data/yelp/train.sent_tok_lower.dat.dev > ./data/yelp/train.sent_tok_lower_unk5.dat.dev
 python ./scripts/yelp/unk_dataset_by_vocab.py ./data/yelp/train.sent_tok_lower_unk5.dat.train.vocab ./data/yelp/test.sent_tok_lower.dat > ./data/yelp/test.sent_tok_lower_unk5.dat
 
+BASELINE
+python ./src/l2c.yelp/baseline.avg.py -T ./data/yelp/train.sent_tok_lower_unk5.dat.train -d ./data/yelp/train.sent_tok_lower_unk5.dat.dev -t ./data/yelp/test.sent_tok_lower_unk5.dat -e ./data/glove/glove.6B.100d.txt.yelp_unk5_filtered
+
 DEBUG
 head -10859 train.sent_tok_lower.dat.dev > train.sent_tok_lower.dat.dev.sample
 python unk_dataset_by_vocab.py train.sent_tok_lower.dat.train.freq_5.vocab train.sent_tok_lower.dat.dev.sample > train.sent_tok_lower_unk.dat.dev.sample
