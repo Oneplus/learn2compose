@@ -44,8 +44,8 @@ bool ConstituentSystem::is_valid(const State & state, const unsigned & action) {
 }
 
 void ConstituentSystem::print_tree(const State & state, std::ostream & os) {
-  BOOST_ASSERT_MSG(state.nid == state.n * 2, "Wouldn't print tree before end of parsing.");
-  unsigned root = state.nid - 1;
+  BOOST_ASSERT_MSG(state.nid + 1 == state.n * 2, "Wouldn't print tree before end of parsing.");
+  unsigned root = state.nid;
   _print_tree(state.pst, root, os);
   os << std::endl;
 }
