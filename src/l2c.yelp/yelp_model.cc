@@ -57,19 +57,17 @@ dynet::expr::Expression YelpAvgPipeL2CModel::objective(dynet::ComputationGraph &
 
   if (policy_type == kRight || policy_type == kLeft || objective_type == kRewardOnly) {
     return reward;
-  } else {  
+  } else {
     std::vector<dynet::expr::Expression> loss;
+    for (unsigned i = 0; i < transition_probs.size(); ++i) {
+      loss.push_back(transition_probs[i]);
+    }
     if (objective_type == kPolicyOnly) {
       float rwd = dynet::as_scalar(cg.get_value(reward));
-      for (unsigned i = 0; i < transition_probs.size(); ++i) {
-        loss.push_back(transition_probs[i] * rwd);
-      }
+      return dynet::expr::sum(loss) * rwd;
     } else if (objective_type == kBothPolicyAndReward) {
-      for (unsigned i = 0; i < transition_probs.size(); ++i) {
-        loss.push_back(transition_probs[i] * reward);
-      }
+      return dynet::expr::sum(loss) * reward;
     }
-    return dynet::expr::sum(loss);
   }
 }
 
