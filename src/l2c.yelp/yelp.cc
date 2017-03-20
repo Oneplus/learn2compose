@@ -157,6 +157,7 @@ int main(int argc, char* argv[]) {
     boost::lexical_cast<std::string>(portable_getpid());
   std::string tempfile_dev = tempfile_prefix + ".dev";
   std::string tempfile_test = tempfile_prefix + ".test";
+  _INFO << "pid: " << portable_getpid();
 
   unsigned max_iter = conf["max_iter"].as<unsigned>();
   float llh = 0.f, llh_in_batch = 0.f;
