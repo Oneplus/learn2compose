@@ -11,9 +11,9 @@
 struct SSTModel : public Model {
   DenseLayer policy_projector;
   DenseLayer policy_scorer;
-  DenseLayer classifier_projector;
   DenseLayer classifier_scorer;
   SymbolEmbedding word_emb;
+  float dropout;
 
   unsigned n_actions;
   unsigned n_classes;
@@ -25,6 +25,8 @@ struct SSTModel : public Model {
            unsigned n_classes,
            TransitionSystem & system,
            TreeLSTMStateBuilder & state_builder,
+           float dropout,
+           bool tune_embedding,
            const Embeddings & embeddings,
            const std::string & policy_name);
 
@@ -36,10 +38,13 @@ struct SSTModel : public Model {
 
   unsigned predict(const SSTInstance & inst);
 
+  unsigned predict(const SSTInstance & inst, State & state);
+
   dynet::expr::Expression get_policy_logits(TreeLSTMState * machine,
                                             const State & state) override;
 
-  dynet::expr::Expression get_classifier_logits(dynet::expr::Expression repr);
+  dynet::expr::Expression get_classifier_logits(dynet::expr::Expression repr,
+                                                bool train);
 };
 
 #endif  //  end for SST_MODEL_H

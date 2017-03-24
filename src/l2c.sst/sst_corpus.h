@@ -20,10 +20,11 @@ struct SSTCorpus : public Corpus {
 
   SSTCorpus();
 
-  void load_training_data(const std::string& filename);
+  void load_training_data(const std::string& filename, bool allow_new_token);
   void load_devel_data(const std::string& filename);
   void load_test_data(const std::string& filename);
-  void parse_data(const std::string& data, SSTInstance & inst, bool train);
+  void parse_data(const std::string& data, SSTInstance & inst,
+                  bool allow_new_class, bool allow_new_token);
 };
 
 #endif  //  end for SST_CORPUS_H

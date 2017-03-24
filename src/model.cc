@@ -201,8 +201,8 @@ dynet::expr::Expression Model::right(dynet::ComputationGraph & cg,
   while (!state.is_terminated()) {
     std::vector<unsigned> valid_actions;
     system.get_valid_actions(state, valid_actions);
-    unsigned action = system.get_shift();
-    if (!system.is_valid(state, action)) { action = system.get_reduce(); }
+    unsigned action = system.get_reduce();
+    if (!system.is_valid(state, action)) { action = system.get_shift(); }
 
     system.perform_action(state, action);
     machine->perform_action(action);
@@ -226,8 +226,8 @@ dynet::expr::Expression Model::right(dynet::ComputationGraph & cg,
     system.get_valid_actions(state, valid_actions);
     dynet::expr::Expression logits = get_policy_logits(machine, state);
     dynet::expr::Expression prob_expr = dynet::expr::softmax(logits);
-    unsigned action = system.get_shift();
-    if (!system.is_valid(state, action)) { action = system.get_reduce(); }
+    unsigned action = system.get_reduce();
+    if (!system.is_valid(state, action)) { action = system.get_shift(); }
 
     system.perform_action(state, action);
     machine->perform_action(action);

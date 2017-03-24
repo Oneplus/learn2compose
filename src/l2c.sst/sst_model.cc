@@ -6,14 +6,16 @@ SSTModel::SSTModel(unsigned word_size,
                    unsigned n_classes,
                    TransitionSystem & system,
                    TreeLSTMStateBuilder & state_builder,
+                   float dropout,
+                   bool tune_embedding,
                    const Embeddings & embeddings,
                    const std::string & policy_name) :
   Model(system, state_builder, policy_name),
   policy_projector(state_builder.m, state_builder.state_repr_dim(), hidden_dim),
   policy_scorer(state_builder.m, hidden_dim, system.num_actions()),
-  classifier_projector(state_builder.m, state_builder.final_repr_dim(), hidden_dim),
-  classifier_scorer(state_builder.m, hidden_dim, n_classes),
-  word_emb(state_builder.m, word_size, word_dim),
+  classifier_scorer(state_builder.m, state_builder.final_repr_dim(), n_classes),
+  word_emb(state_builder.m, word_size, word_dim, tune_embedding),
+  dropout(dropout),
   n_actions(system.num_actions()),
   n_classes(n_classes),
   word_dim(word_dim) {
@@ -26,7 +28,6 @@ SSTModel::SSTModel(unsigned word_size,
 void SSTModel::new_graph(dynet::ComputationGraph & cg) {
   policy_projector.new_graph(cg);
   policy_scorer.new_graph(cg);
-  classifier_projector.new_graph(cg);
   classifier_scorer.new_graph(cg);
   word_emb.new_graph(cg);
 }
@@ -50,7 +51,8 @@ dynet::expr::Expression SSTModel::objective(dynet::ComputationGraph & cg,
 
   // neg -> minimize
   dynet::expr::Expression reward =
-    dynet::expr::pickneglogsoftmax(get_classifier_logits(final_repr), inst.label);
+    dynet::expr::pickneglogsoftmax(get_classifier_logits(final_repr, true),
+                                   inst.label);
 
   if (policy_type == kRight || policy_type == kLeft || objective_type == kRewardOnly) {
     return reward;
@@ -86,7 +88,29 @@ unsigned SSTModel::predict(const SSTInstance & inst) {
     final_repr = right(cg, input);
   }
 
-  dynet::expr::Expression pred_expr = get_classifier_logits(final_repr);
+  dynet::expr::Expression pred_expr = get_classifier_logits(final_repr, false);
+  std::vector<float> pred_score = dynet::as_vector(cg.get_value(pred_expr));
+  return std::max_element(pred_score.begin(), pred_score.end()) - pred_score.begin();
+}
+
+unsigned SSTModel::predict(const SSTInstance & inst,
+                           State & state) {
+  dynet::ComputationGraph cg;
+  new_graph(cg);
+  unsigned len = inst.sentence.size();
+  std::vector<dynet::expr::Expression> input(len);
+  for (unsigned i = 0; i < len; ++i) { input[i] = word_emb.embed(inst.sentence[i]); }
+
+  dynet::expr::Expression final_repr;
+  if (policy_type == kSample) {
+    final_repr = decode(cg, input, state);
+  } else if (policy_type == kLeft) {
+    final_repr = left(cg, input, state);
+  } else {
+    final_repr = right(cg, input, state);
+  }
+
+  dynet::expr::Expression pred_expr = get_classifier_logits(final_repr, false);
   std::vector<float> pred_score = dynet::as_vector(cg.get_value(pred_expr));
   return std::max_element(pred_score.begin(), pred_score.end()) - pred_score.begin();
 }
@@ -98,7 +122,11 @@ dynet::expr::Expression SSTModel::get_policy_logits(TreeLSTMState * machine,
   );
 }
 
-dynet::expr::Expression SSTModel::get_classifier_logits(dynet::expr::Expression repr) {
-  return classifier_scorer.get_output(dynet::expr::rectify(
-    classifier_projector.get_output(repr)));
+dynet::expr::Expression SSTModel::get_classifier_logits(dynet::expr::Expression repr,
+                                                        bool train) {
+  dynet::expr::Expression ret = repr;
+  if (train && dropout > 0.f) {
+    ret = dynet::expr::dropout(ret, dropout);
+  }
+  return classifier_scorer.get_output(ret);
 }

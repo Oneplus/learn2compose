@@ -11,7 +11,7 @@
 SSTCorpus::SSTCorpus() : Corpus(), n_classes(0) {
 }
 
-void SSTCorpus::load_training_data(const std::string& filename) {
+void SSTCorpus::load_training_data(const std::string& filename, bool allow_new_token) {
   _INFO << "Corpus:: reading training data from: " << filename;
   word_map.insert(Corpus::BAD0);
   word_map.insert(Corpus::UNK);
@@ -23,7 +23,7 @@ void SSTCorpus::load_training_data(const std::string& filename) {
   std::string line;
   while (std::getline(in, line)) {
     boost::algorithm::trim(line);
-    parse_data(line, training_instances[n_train], true);
+    parse_data(line, training_instances[n_train], true, allow_new_token);
     ++n_train;
   }
   _INFO << "Corpus:: loaded " << n_train << " training sentences.";
@@ -42,7 +42,7 @@ void SSTCorpus::load_devel_data(const std::string& filename) {
   std::string line;
   while (std::getline(in, line)) {
     boost::algorithm::trim(line);
-    parse_data(line, devel_instances[n_devel], false);
+    parse_data(line, devel_instances[n_devel], false, false);
     ++n_devel;
   }
   _INFO << "Corpus:: loaded " << n_devel << " development sentences.";
@@ -61,19 +61,20 @@ void SSTCorpus::load_test_data(const std::string& filename) {
   std::string line;
   while (std::getline(in, line)) {
     boost::algorithm::trim(line);
-    parse_data(line, test_instances[n_test], false);
+    parse_data(line, test_instances[n_test], false, false);
     ++n_test;
   }
   _INFO << "Corpus:: loaded " << n_test << " test sentences.";
   _INFO << "Corpus:: # word in alphabet is " << word_map.size() << " after loading test.";
 }
 
-void SSTCorpus::parse_data(const std::string& data, SSTInstance& input, bool train) {
+void SSTCorpus::parse_data(const std::string& data, SSTInstance& input,
+                           bool allow_new_class, bool allow_new_token) {
   // json format.
   unsigned p = data.find('\t');
   std::string label_name = data.substr(0, p);
   input.label = boost::lexical_cast<unsigned>(label_name); // 0 - 4
-  if (train) {
+  if (allow_new_class) {
     if (input.label >= n_classes) { n_classes = input.label + 1; }
   } else {
     assert(input.label < n_classes);
@@ -85,7 +86,7 @@ void SSTCorpus::parse_data(const std::string& data, SSTInstance& input, bool tra
   input.sentence.clear();
   for (const auto& token : tokens) {
     input.sentence.push_back(
-      train ?
+      allow_new_token ?
       word_map.insert(token) :
       (word_map.contains(token) ? word_map.get(token) : word_map.get(Corpus::UNK))
     );

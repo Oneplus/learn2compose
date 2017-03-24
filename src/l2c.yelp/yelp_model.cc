@@ -222,8 +222,8 @@ dynet::expr::Expression YelpBiGRUPipeL2CModelBatch::sentence_expr(const YelpInst
       unsigned len = sentence.size();
       if (step + 1 == len) {
         sentence_expr_cache[s] = dynet::expr::concatenate({
-          dynet::expr::pick_batch(fwd_gru.back(), s),
-          dynet::expr::pick_batch(bwd_gru.back(), s)
+          dynet::expr::pick_batch_elem(fwd_gru.back(), s),
+          dynet::expr::pick_batch_elem(bwd_gru.back(), s)
         });
       }
     }

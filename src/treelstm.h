@@ -51,6 +51,10 @@ struct TreeLSTMStateBuilder {
   virtual TreeLSTMState * build() = 0;
 };
 
+//=========================================================
+// Constituent Tree LSTM
+//=========================================================
+
 struct ConstituentTreeLSTMModel : public TreeLSTMModel {
   // TreeLSTM function.
   Merge2Layer input_gate;
@@ -94,6 +98,10 @@ struct ConstituentTreeLSTMStateBuilder : public TreeLSTMStateBuilder {
   TreeLSTMState * build();
 };
 
+//=========================================================
+// Dependency Tree LSTM
+//=========================================================
+
 struct DependencyTreeLSTMModel : public TreeLSTMModel {
   Merge2Layer input_gate;
   Merge2Layer output_gate;
@@ -121,7 +129,8 @@ struct DependencyTreeLSTMState : public TreeLSTMState {
   void new_graph(dynet::ComputationGraph & cg) override;
   dynet::expr::Expression state_repr(const State & state) override;
   dynet::expr::Expression final_repr(const State & state) override;
-  TreeLSTMCell2 final_repr_recursive(const std::vector<std::vector<unsigned>>& tree, unsigned now);
+  TreeLSTMCell2 final_repr_recursive(const std::vector<std::vector<unsigned>>& tree,
+                                     unsigned now);
   void perform_action(const unsigned & action) override;
 };
 
@@ -129,6 +138,41 @@ struct DependencyTreeLSTMStateBuilder : public TreeLSTMStateBuilder {
   DependencyTreeLSTMModel * treelstm_model;
 
   DependencyTreeLSTMStateBuilder(dynet::Model & m, unsigned word_dim);
+  unsigned state_repr_dim() const override;
+  unsigned final_repr_dim() const override;
+  TreeLSTMState * build();
+};
+
+//=========================================================
+// Dependency Tree with Stack-LSTM
+//=========================================================
+
+struct DependencyTreeLSTMWithBiLSTMModel : public DependencyTreeLSTMModel {
+  dynet::LSTMBuilder fwd_lstm;
+  dynet::LSTMBuilder bwd_lstm;
+
+  DependencyTreeLSTMWithBiLSTMModel(dynet::Model & m, unsigned word_dim);
+  void new_graph(dynet::ComputationGraph & cg) override;
+};
+
+struct DependencyTreeLSTMWithBiLSTMState : public TreeLSTMState {
+  std::vector<dynet::expr::Expression> buffer;
+  DependencyTreeLSTMWithBiLSTMModel & treelstm_model;
+
+  DependencyTreeLSTMWithBiLSTMState(DependencyTreeLSTMWithBiLSTMModel & treelstm_model);
+  void initialize(const std::vector<dynet::expr::Expression> & input);
+  void new_graph(dynet::ComputationGraph & cg) override;
+  dynet::expr::Expression state_repr(const State & state) override;
+  dynet::expr::Expression final_repr(const State & state) override;
+  TreeLSTMCell2 final_repr_recursive(const std::vector<std::vector<unsigned>>& tree,
+                                     unsigned now);
+  void perform_action(const unsigned & action) override;
+};
+
+struct DependencyTreeLSTMWithBiLSTMStateBuilder : public TreeLSTMStateBuilder {
+  DependencyTreeLSTMWithBiLSTMModel * treelstm_model;
+
+  DependencyTreeLSTMWithBiLSTMStateBuilder(dynet::Model & m, unsigned word_dim);
   unsigned state_repr_dim() const override;
   unsigned final_repr_dim() const override;
   TreeLSTMState * build();

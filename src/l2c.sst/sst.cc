@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <unordered_map>
 #include <boost/program_options.hpp>
 #include "logging.h"
@@ -26,6 +27,8 @@ void init_command_line(int argc, char* argv[], po::variables_map& conf) {
     ("max_iter", po::value<unsigned>()->default_value(10), "The number of iteration.")
     ("report_stops", po::value<unsigned>()->default_value(1000), "The reporting stops")
     ("evaluate_stops", po::value<unsigned>()->default_value(5000), "The evaluation stops")
+    ("tune_embedding", "use to specify tuning the word embedding.")
+    ("dropout", po::value<float>()->default_value(0.f), "The dropout rate.")
     ("help,h", "Show help information.")
     ;
   po::options_description optimizer_opt = get_optimizer_options();
@@ -46,12 +49,17 @@ void init_command_line(int argc, char* argv[], po::variables_map& conf) {
 
 float evaluate(SSTModel & engine,
                SSTCorpus & corpus,
-               bool devel) {
+               bool devel,
+               const std::string & tempfile) {
   unsigned n = devel ? corpus.n_devel : corpus.n_test;
   unsigned n_corr = 0;
+  std::ofstream ofs(tempfile);
   for (unsigned i = 0; i < n; ++i) {
     SSTInstance & inst = (devel ? corpus.devel_instances[i] : corpus.test_instances[i]);
-    unsigned result = engine.predict(inst);
+    State state(inst.sentence.size());
+    unsigned result = engine.predict(inst, state);
+    ofs << "gold: " << inst.label << " " << "pred: " << result << std::endl;
+    engine.system.print_tree(state, ofs);
     if (result == inst.label) { n_corr++; }
   }
 
@@ -83,7 +91,7 @@ int main(int argc, char* argv[]) {
                        embeddings, corpus);
   _INFO << "Main:: loaded " << embeddings.size() << " pretrained word embeddings.";
 
-  corpus.load_training_data(conf["training_data"].as<std::string>());
+  corpus.load_training_data(conf["training_data"].as<std::string>(), conf.count("tune_embedding"));
   corpus.load_devel_data(conf["devel_data"].as<std::string>());
   corpus.load_test_data(conf["test_data"].as<std::string>());
   _INFO << "Main:: " << corpus.n_classes << "-way classification.";
@@ -105,11 +113,22 @@ int main(int argc, char* argv[]) {
                   corpus.n_classes,
                   *system,
                   *state_builder,
+                  conf["dropout"].as<float>(),
+                  conf.count("tune_embedding"),
                   embeddings,
                   policy_name);
 
   std::string name = "l2c.model.sst." + system_name + "." + policy_name + "." +
     boost::lexical_cast<std::string>(portable_getpid());
+  std::string tempfile_prefix = "l2c.eval.sst." +
+    boost::lexical_cast<std::string>(portable_getpid());
+  std::string tempfile_dev = tempfile_prefix + ".dev";
+  std::string tempfile_test = tempfile_prefix + ".test";
+  _INFO << "Tune embedding: " << (conf.count("tune_embedding") > 0 ? "TRUE" : "FALSE");
+  _INFO << "Dropout rate: " << conf["dropout"].as<float>();
+  _INFO << "Going to write model to: " << name;
+  _INFO << "               devel to: " << tempfile_dev;
+  _INFO << "               test to:  " << tempfile_test;
 
   unsigned max_iter = conf["max_iter"].as<unsigned>();
   float llh = 0.f, llh_in_batch = 0.f;
@@ -124,7 +143,7 @@ int main(int argc, char* argv[]) {
       {
         dynet::ComputationGraph cg;
         dynet::expr::Expression l = engine.objective(cg, inst);
-        float lp = dynet::as_scalar(cg.forward(l));
+        float lp = dynet::as_scalar(cg.incremental_forward(l));
         cg.backward(l);
         trainer->update();
         llh += lp;
@@ -138,22 +157,22 @@ int main(int argc, char* argv[]) {
         llh_in_batch = 0.f;
       }
       if (logc % conf["evaluate_stops"].as<unsigned>() == 0) {
-        float p = evaluate(engine, corpus, true);
+        float p = evaluate(engine, corpus, true, tempfile_dev);
         float epoch = (float(logc) / corpus.n_train);
         _INFO << "Main:: iter #" << iter << " (epoch " << epoch << ") dev p: " << p;
         if (p > best_dev_p) {
           best_dev_p = p;
-          test_p = evaluate(engine, corpus, false);
+          test_p = evaluate(engine, corpus, false, tempfile_test);
           _INFO << "Main:: new BEST dev: " << best_dev_p << ", test: " << test_p;
           dynet::save_dynet_model(name, (&model));
         }
       }
     }
-    float p = evaluate(engine, corpus, true);
+    float p = evaluate(engine, corpus, true, tempfile_dev);
     _INFO << "Main:: end of iter #" << iter << " loss: " << llh << " dev p: " << p;
     if (p > best_dev_p) {
       best_dev_p = p;
-      test_p = evaluate(engine, corpus, false);
+      test_p = evaluate(engine, corpus, false, tempfile_test);
       _INFO << "Main:: new BEST dev: " << best_dev_p << ", test: " << test_p;
       dynet::save_dynet_model(name, (&model));
     }

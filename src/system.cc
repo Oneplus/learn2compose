@@ -147,8 +147,9 @@ void DependencySystem::_print_tree(const std::vector<std::vector<unsigned>>& tre
                                    std::vector<std::string> & canvas) {
   const std::vector<unsigned> & node = tree[now];
   if (node.size() > 0) {
-    unsigned start = (node[0] < now ? node[0] : now);
-    unsigned end = (node.back() > now ? node.back() : now);
+    unsigned start = now;
+    unsigned end = now;
+    for (auto& c : node) { start = (c < start ? c : start); end = (c > end ? c : end); }
     canvas[start][offset] = '.';
     canvas[end][offset] = '`';
     for (unsigned k = start + 1; k < end; ++k) { canvas[k][offset] = '|'; }

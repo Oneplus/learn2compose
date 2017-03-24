@@ -27,6 +27,7 @@ void init_command_line(int argc, char* argv[], po::variables_map& conf) {
     ("word_dim", po::value<unsigned>()->default_value(100), "The dimension of embedding.")
     ("hidden_dim", po::value<unsigned>()->default_value(100), "The hidden dimension.")
     ("max_iter", po::value<unsigned>()->default_value(10), "The number of iteration.")
+    ("dropout", po::value<float>()->default_value(0.f), "The dropout rate.")
     ("tune_embedding", "Enable tuning embedding.")
     ("report_stops", po::value<unsigned>()->default_value(1000), "The reporting stops")
     ("evaluate_stops", po::value<unsigned>()->default_value(5000), "The evaluation stops")
@@ -178,7 +179,7 @@ int main(int argc, char* argv[]) {
       {
         dynet::ComputationGraph cg;
         dynet::expr::Expression l = engine->objective(cg, inst, seq[iter].second);
-        float lp = dynet::as_scalar(cg.forward(l));
+        float lp = dynet::as_scalar(cg.incremental_forward(l));
         cg.backward(l);
         trainer->update();
         llh += lp;

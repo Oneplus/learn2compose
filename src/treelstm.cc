@@ -234,14 +234,134 @@ TreeLSTMState * DependencyTreeLSTMStateBuilder::build() {
   return new DependencyTreeLSTMState(*treelstm_model);
 }
 
+
+DependencyTreeLSTMWithBiLSTMModel::DependencyTreeLSTMWithBiLSTMModel(dynet::Model & m,
+                                                                     unsigned word_dim) : 
+  DependencyTreeLSTMModel(m, word_dim),
+  fwd_lstm(1, word_dim, word_dim, m),
+  bwd_lstm(1, word_dim, word_dim, m) {
+}
+
+void DependencyTreeLSTMWithBiLSTMModel::new_graph(dynet::ComputationGraph & cg) {
+  fwd_lstm.new_graph(cg);
+  bwd_lstm.new_graph(cg);
+}
+
+DependencyTreeLSTMWithBiLSTMState::DependencyTreeLSTMWithBiLSTMState(DependencyTreeLSTMWithBiLSTMModel & treelstm_model)
+  : treelstm_model(treelstm_model) {
+}
+
+void DependencyTreeLSTMWithBiLSTMState::initialize(const std::vector<dynet::expr::Expression>& input) {
+  treelstm_model.fwd_lstm.start_new_sequence();
+  treelstm_model.bwd_lstm.start_new_sequence();
+  unsigned len = input.size();
+  buffer.resize(len);
+  std::vector<dynet::expr::Expression> fwd_output(len);
+  std::vector<dynet::expr::Expression> bwd_output(len);
+  for (unsigned i = 0; i < len; ++i) {
+    fwd_output[i] = treelstm_model.fwd_lstm.add_input(input[i]);
+    bwd_output[len - i - 1] = treelstm_model.bwd_lstm.add_input(input[len - i - 1]);
+  }
+  for (unsigned i = 0; i < len; ++i) {
+    buffer[i] = dynet::expr::concatenate({ fwd_output[i], bwd_output[i] });
+  }
+}
+
+void DependencyTreeLSTMWithBiLSTMState::new_graph(dynet::ComputationGraph & cg) {
+  treelstm_model.new_graph(cg);
+}
+
+dynet::expr::Expression DependencyTreeLSTMWithBiLSTMState::state_repr(const State & state) {
+  unsigned stack_size = state.sigma.size();
+  unsigned buffer_size = buffer.size();
+  return dynet::expr::concatenate({
+    stack_size > 1 ? buffer[state.sigma[stack_size - 2]] : treelstm_model.sigma_guard_i,
+    stack_size > 0 ? buffer[state.sigma.back()] : treelstm_model.sigma_guard_j,
+    state.beta < buffer_size ? buffer[state.beta] : treelstm_model.beta_guard
+  });
+}
+
+dynet::expr::Expression DependencyTreeLSTMWithBiLSTMState::final_repr(const State & state) {
+  unsigned n_words = buffer.size();
+  unsigned root = UINT_MAX;
+  std::vector<std::vector<unsigned>> tree(n_words);
+  for (unsigned i = 0; i < n_words; ++i) {
+    unsigned hed = state.heads[i];
+    if (hed == UINT_MAX) { BOOST_ASSERT(root == UINT_MAX); root = i; } else { tree[hed].push_back(i); }
+  }
+  BOOST_ASSERT(root != UINT_MAX);
+  TreeLSTMCell2 cell = final_repr_recursive(tree, root);
+  return cell.first;
+}
+
+TreeLSTMState::TreeLSTMCell2 DependencyTreeLSTMWithBiLSTMState::final_repr_recursive(
+  const std::vector<std::vector<unsigned>>& tree,
+  unsigned now) {
+  unsigned n_children = tree[now].size();
+  if (n_children == 0) { /* leaf */
+    return std::make_pair(buffer[now], treelstm_model.zero_padding);
+  }
+
+  std::vector<dynet::expr::Expression> h_(n_children);
+  std::vector<dynet::expr::Expression> c_(n_children);
+  for (unsigned k = 0; k < n_children; ++k) {
+    unsigned c = tree[now][k];
+    auto payload = final_repr_recursive(tree, c);
+    h_[k] = payload.first;
+    c_[k] = payload.second;
+  }
+
+  dynet::expr::Expression x_j = buffer[now];
+  dynet::expr::Expression h_sum = dynet::expr::sum(h_);
+  dynet::expr::Expression i_j = dynet::expr::logistic(treelstm_model.input_gate.get_output(x_j, h_sum));
+
+  std::vector<dynet::expr::Expression> f_j_(n_children);
+  for (unsigned k = 0; k < n_children; ++k) {
+    f_j_[k] = dynet::expr::logistic(treelstm_model.forget_gate.get_output(x_j, h_[k]));
+  }
+
+  dynet::expr::Expression o_j = dynet::expr::logistic(treelstm_model.output_gate.get_output(x_j, h_sum));
+  dynet::expr::Expression u_j = dynet::expr::tanh(treelstm_model.rnn_cell.get_output(x_j, h_sum));
+  std::vector<dynet::expr::Expression> c_j_(n_children);
+  for (unsigned k = 0; k < n_children; ++k) {
+    c_j_[k] = dynet::expr::cmult(f_j_[k], c_[k]);
+  }
+  dynet::expr::Expression c = dynet::expr::cmult(i_j, u_j) + dynet::expr::sum(c_j_);
+  dynet::expr::Expression h = dynet::expr::cmult(o_j, dynet::expr::tanh(c));
+  return std::make_pair(h, c);
+}
+
+void DependencyTreeLSTMWithBiLSTMState::perform_action(const unsigned & action) {
+  // do nothing.
+}
+
+DependencyTreeLSTMWithBiLSTMStateBuilder::DependencyTreeLSTMWithBiLSTMStateBuilder(dynet::Model & m, unsigned word_dim) :
+  TreeLSTMStateBuilder(m),
+  treelstm_model(new DependencyTreeLSTMWithBiLSTMModel(m, word_dim)) {
+}
+
+unsigned DependencyTreeLSTMWithBiLSTMStateBuilder::state_repr_dim() const {
+  return treelstm_model->word_dim * 3;
+}
+
+unsigned DependencyTreeLSTMWithBiLSTMStateBuilder::final_repr_dim() const {
+  return treelstm_model->word_dim;
+}
+
+TreeLSTMState * DependencyTreeLSTMWithBiLSTMStateBuilder::build() {
+  return new DependencyTreeLSTMWithBiLSTMState(*treelstm_model);
+}
+
 TreeLSTMStateBuilder * get_state_builder(const std::string & name,
                                          dynet::Model & m,
-                                         unsigned hidde_dim) {
+                                         unsigned word_dim) {
   TreeLSTMStateBuilder * state_builder = nullptr;
   if (name == "constituent" || name == "cons") {
-    state_builder = new ConstituentTreeLSTMStateBuilder(m, hidde_dim);
+    state_builder = new ConstituentTreeLSTMStateBuilder(m, word_dim);
   } else if (name == "dependency" || name == "dep") {
-    state_builder = new DependencyTreeLSTMStateBuilder(m, hidde_dim);
+    state_builder = new DependencyTreeLSTMStateBuilder(m, word_dim);
+  } else if (name == "dependency_stack_lstm" || name == "dep_slstm") {
+    state_builder = new DependencyTreeLSTMWithBiLSTMStateBuilder(m, word_dim);
   } else {
     _ERROR << "Unknown state builder name: " << name;
   }

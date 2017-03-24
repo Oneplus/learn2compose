@@ -23,7 +23,7 @@ struct Corpus {
   Alphabet word_map;
   Corpus();
 
-  virtual void load_training_data(const std::string& filename) = 0;
+  virtual void load_training_data(const std::string& filename, bool allow_new_token = false) = 0;
   virtual void load_devel_data(const std::string& filename) = 0;
   virtual void load_test_data(const std::string& filename) = 0;
   unsigned get_or_add_word(const std::string& word);
