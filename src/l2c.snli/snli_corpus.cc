@@ -12,7 +12,7 @@
 SNLICorpus::SNLICorpus() : Corpus() {
 }
 
-void SNLICorpus::load_training_data(const std::string& filename) {
+void SNLICorpus::load_training_data(const std::string& filename, bool allow_new_tokens) {
   _INFO << "Corpus:: reading training data from: " << filename;
   word_map.insert(Corpus::BAD0);
   word_map.insert(Corpus::UNK);

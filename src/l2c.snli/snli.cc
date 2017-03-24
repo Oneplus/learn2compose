@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
                        embeddings, corpus);
   _INFO << "Main:: loaded " << embeddings.size() << " embeddings.";
 
-  corpus.load_training_data(conf["training_data"].as<std::string>());
+  corpus.load_training_data(conf["training_data"].as<std::string>(), false);
   corpus.load_devel_data(conf["devel_data"].as<std::string>());
   corpus.load_test_data(conf["test_data"].as<std::string>());
 

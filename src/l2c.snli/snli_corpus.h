@@ -20,7 +20,7 @@ struct SNLICorpus : public Corpus {
 
   SNLICorpus();
 
-  void load_training_data(const std::string& filename);
+  void load_training_data(const std::string& filename, bool allow_new_tokens);
   void load_devel_data(const std::string& filename);
   void load_test_data(const std::string& filename);
   bool parse_data(const std::string& data, SNLIInstance& input, bool train);
