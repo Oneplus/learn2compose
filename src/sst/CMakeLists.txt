@@ -10,6 +10,8 @@ add_library (sst_common
   evaluate.h
   evaluate.cc)
 
+target_link_libraries (sst_common common)
+
 add_subdirectory (treelstm)
 add_subdirectory (l2c)
 add_subdirectory (pg)
