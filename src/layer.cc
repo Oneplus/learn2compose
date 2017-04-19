@@ -5,11 +5,25 @@ SymbolEmbedding::SymbolEmbedding(dynet::Model& m,
                                  unsigned dim,
                                  bool trainable) :
   LayerI(trainable),
-  p_labels(m.add_lookup_parameters(n, { dim, 1 })) {
+  p_labels(m.add_lookup_parameters(n, { dim })) {
+}
+
+SymbolEmbedding::SymbolEmbedding(dynet::Model& m,
+                                 unsigned n,
+                                 unsigned dim,
+                                 float scale,
+                                 bool trainable) :
+  LayerI(trainable),
+  p_labels(m.add_lookup_parameters(n, { dim }, dynet::ParameterInitUniform(scale))) {
 }
 
 void SymbolEmbedding::new_graph(dynet::ComputationGraph& cg_) {
   cg = &cg_;
+}
+
+std::vector<dynet::expr::Expression> SymbolEmbedding::get_params() {
+  std::vector<dynet::expr::Expression> ret;
+  return ret;
 }
 
 dynet::expr::Expression SymbolEmbedding::embed(unsigned label_id) {
@@ -38,6 +52,11 @@ void BinnedDistanceEmbedding::new_graph(dynet::ComputationGraph& cg_) {
   cg = &cg_;
 }
 
+std::vector<dynet::expr::Expression> BinnedDistanceEmbedding::get_params() {
+  std::vector<dynet::expr::Expression> ret;
+  return ret;
+}
+
 dynet::expr::Expression BinnedDistanceEmbedding::embed(int dist) {
   unsigned base = (dist < 0 ? max_bin : 0);
   unsigned dist_std = 0;
@@ -64,6 +83,11 @@ BinnedDurationEmbedding::BinnedDurationEmbedding(dynet::Model& m,
 
 void BinnedDurationEmbedding::new_graph(dynet::ComputationGraph& cg_) {
   cg = &cg_;
+}
+
+std::vector<dynet::expr::Expression> BinnedDurationEmbedding::get_params() {
+  std::vector<dynet::expr::Expression> ret;
+  return ret;
 }
 
 dynet::expr::Expression BinnedDurationEmbedding::embed(unsigned dur) {
@@ -127,8 +151,12 @@ void CNNLayer::new_graph(dynet::ComputationGraph& hg) {
   padding = dynet::expr::zeroes(hg, { input_dim });
 }
 
+std::vector<dynet::expr::Expression> CNNLayer::get_params() {
+  return std::vector<dynet::expr::Expression>();
+}
+
 dynet::expr::Expression CNNLayer::get_output(const std::vector<dynet::expr::Expression>& c) {
-  std::vector<dynet::expr::Expression> s(c);
+  /*std::vector<dynet::expr::Expression> s(c);
   std::vector<dynet::expr::Expression> tmp;
   for (unsigned ii = 0; ii < filters_info.size(); ++ii) {
     const auto& filter_width = filters_info[ii].first;
@@ -145,7 +173,8 @@ dynet::expr::Expression CNNLayer::get_output(const std::vector<dynet::expr::Expr
     }
     for (unsigned p = 0; p < filter_width - 1; ++p) { s.pop_back(); }
   }
-  return W * dynet::expr::concatenate(tmp);
+  return W * dynet::expr::concatenate(tmp);*/
+  return dynet::expr::Expression();
 }
 
 SoftmaxLayer::SoftmaxLayer(dynet::Model& m,
@@ -167,6 +196,11 @@ void SoftmaxLayer::new_graph(dynet::ComputationGraph & hg) {
   }
 }
 
+std::vector<dynet::expr::Expression> SoftmaxLayer::get_params() {
+  std::vector<dynet::expr::Expression> ret = { B, W };
+  return ret;
+}
+
 dynet::expr::Expression SoftmaxLayer::get_output(const dynet::expr::Expression& expr) {
   return dynet::expr::log_softmax(dynet::expr::affine_transform({B, W, expr}));
 }
@@ -177,7 +211,7 @@ DenseLayer::DenseLayer(dynet::Model& m,
                        bool trainable) :
   LayerI(trainable),
   p_W(m.add_parameters({ dim_output, dim_input })),
-  p_B(m.add_parameters({ dim_output, 1 })) {
+  p_B(m.add_parameters({ dim_output }, dynet::ParameterInitConst(0.f))) {
 }
 
 void DenseLayer::new_graph(dynet::ComputationGraph& hg) {
@@ -190,6 +224,11 @@ void DenseLayer::new_graph(dynet::ComputationGraph& hg) {
   }
 }
 
+std::vector<dynet::expr::Expression> DenseLayer::get_params() {
+  std::vector<dynet::expr::Expression> ret = { B, W };
+  return ret;
+}
+
 dynet::expr::Expression DenseLayer::get_output(const dynet::expr::Expression& expr) {
   return dynet::expr::affine_transform({ B, W, expr });
 }
@@ -200,7 +239,7 @@ Merge2Layer::Merge2Layer(dynet::Model& m,
                          unsigned dim_output,
                          bool trainable) :
   LayerI(trainable),
-  p_B(m.add_parameters({ dim_output, 1 })),
+  p_B(m.add_parameters({ dim_output }, dynet::ParameterInitConst(0.f))),
   p_W1(m.add_parameters({ dim_output, dim_input1 })),
   p_W2(m.add_parameters({ dim_output, dim_input2 })) {
 }
@@ -217,6 +256,11 @@ void Merge2Layer::new_graph(dynet::ComputationGraph& hg) {
   }
 }
 
+std::vector<dynet::expr::Expression> Merge2Layer::get_params() {
+  std::vector<dynet::expr::Expression> ret = { B, W1, W2 };
+  return ret;
+}
+
 dynet::expr::Expression Merge2Layer::get_output(const dynet::expr::Expression& expr1,
                                                 const dynet::expr::Expression& expr2) {
   return dynet::expr::affine_transform({B, W1, expr1, W2, expr2});
@@ -229,7 +273,7 @@ Merge3Layer::Merge3Layer(dynet::Model& m,
                          unsigned dim_output,
                          bool trainable) :
   LayerI(trainable),
-  p_B(m.add_parameters({ dim_output, 1 })),
+  p_B(m.add_parameters({ dim_output }, dynet::ParameterInitConst(0.f))),
   p_W1(m.add_parameters({ dim_output, dim_input1 })),
   p_W2(m.add_parameters({ dim_output, dim_input2 })),
   p_W3(m.add_parameters({ dim_output, dim_input3 })) {
@@ -249,6 +293,11 @@ void Merge3Layer::new_graph(dynet::ComputationGraph& hg) {
   }
 }
 
+std::vector<dynet::expr::Expression> Merge3Layer::get_params() {
+  std::vector<dynet::expr::Expression> ret = { B, W1, W2, W3 };
+  return ret;
+}
+
 dynet::expr::Expression Merge3Layer::get_output(const dynet::expr::Expression& expr1,
                                                 const dynet::expr::Expression& expr2,
                                                 const dynet::expr::Expression& expr3) {
@@ -263,7 +312,7 @@ Merge4Layer::Merge4Layer(dynet::Model& m,
                          unsigned dim_output,
                          bool trainable) :
   LayerI(trainable),
-  p_B(m.add_parameters({ dim_output, 1 })),
+  p_B(m.add_parameters({ dim_output }, dynet::ParameterInitConst(0.f))),
   p_W1(m.add_parameters({ dim_output, dim_input1 })),
   p_W2(m.add_parameters({ dim_output, dim_input2 })),
   p_W3(m.add_parameters({ dim_output, dim_input3 })),
@@ -286,6 +335,11 @@ void Merge4Layer::new_graph(dynet::ComputationGraph& hg) {
   }
 }
 
+std::vector<dynet::expr::Expression> Merge4Layer::get_params() {
+  std::vector<dynet::expr::Expression> ret = { B, W1, W2, W3, W4 };
+  return ret;
+}
+
 dynet::expr::Expression Merge4Layer::get_output(const dynet::expr::Expression& expr1,
                                                 const dynet::expr::Expression& expr2,
                                                 const dynet::expr::Expression& expr3,
@@ -302,7 +356,7 @@ Merge5Layer::Merge5Layer(dynet::Model& m,
                          unsigned dim_output,
                          bool trainable) :
   LayerI(trainable),
-  p_B(m.add_parameters({ dim_output, 1 })),
+  p_B(m.add_parameters({ dim_output }, dynet::ParameterInitConst(0.f))),
   p_W1(m.add_parameters({ dim_output, dim_input1 })),
   p_W2(m.add_parameters({ dim_output, dim_input2 })),
   p_W3(m.add_parameters({ dim_output, dim_input3 })),
@@ -328,6 +382,11 @@ void Merge5Layer::new_graph(dynet::ComputationGraph & hg) {
   }
 }
 
+std::vector<dynet::expr::Expression> Merge5Layer::get_params() {
+  std::vector<dynet::expr::Expression> ret = { B, W1, W2, W3, W4, W5 };
+  return ret;
+}
+
 dynet::expr::Expression Merge5Layer::get_output(const dynet::expr::Expression& expr1,
                                                 const dynet::expr::Expression& expr2,
                                                 const dynet::expr::Expression& expr3,
@@ -348,7 +407,7 @@ Merge6Layer::Merge6Layer(dynet::Model& m,
                          unsigned dim_output,
                          bool trainable) :
   LayerI(trainable),
-  p_B(m.add_parameters({ dim_output, 1 })),
+  p_B(m.add_parameters({ dim_output }, dynet::ParameterInitConst(0.f))),
   p_W1(m.add_parameters({ dim_output, dim_input1 })),
   p_W2(m.add_parameters({ dim_output, dim_input2 })),
   p_W3(m.add_parameters({ dim_output, dim_input3 })),
@@ -375,6 +434,11 @@ void Merge6Layer::new_graph(dynet::ComputationGraph & hg) {
     W5 = dynet::expr::const_parameter(hg, p_W5);
     W6 = dynet::expr::const_parameter(hg, p_W6);
   }
+}
+
+std::vector<dynet::expr::Expression> Merge6Layer::get_params() {
+  std::vector<dynet::expr::Expression> ret = { B, W1, W2, W3, W4, W5, W6 };
+  return ret;
 }
 
 dynet::expr::Expression Merge6Layer::get_output(

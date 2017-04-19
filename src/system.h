@@ -19,6 +19,8 @@ struct State {
 
 struct TransitionSystem {
   virtual unsigned num_actions() const = 0;
+  virtual void get_oracle_actions(const std::vector<unsigned> & parents,
+                                  std::vector<unsigned> & actions) = 0;
   virtual bool is_valid(const State & state, const unsigned & action) = 0;
   virtual void get_valid_actions(const State & state, std::vector<unsigned> & actions) = 0;
   virtual void perform_action(State & state, const unsigned & action) = 0;
@@ -29,13 +31,18 @@ struct TransitionSystem {
 
 struct ConstituentSystem : public TransitionSystem {
   unsigned num_actions() const { return 2; }
+  void get_oracle_actions(const std::vector<unsigned> & parents,
+                          std::vector<unsigned> & actions);
+  void get_oracle_actions_travel(const std::vector<std::pair<unsigned, unsigned>> & tree,
+                                 unsigned now,
+                                 std::vector<unsigned> & actions);                                                  
   void get_valid_actions(const State & state, std::vector<unsigned> & actions);
   void perform_action(State & state, const unsigned & action) override;
   bool is_valid(const State & state, const unsigned & action) override;
   unsigned get_shift() override { return 0; }
   unsigned get_reduce() override { return 1; }
   void print_tree(const State & stat, std::ostream & os) override;
-  void _print_tree(const std::vector<std::pair<unsigned, unsigned>> & pst, unsigned now, std::ostream & os);
+  static void _print_tree(const std::vector<std::pair<unsigned, unsigned>> & pst, unsigned now, std::ostream & os);
 
   static bool is_shift(const unsigned& action) { return action == 0; }
   static bool is_reduce(const unsigned& action) { return action == 1; }
@@ -49,17 +56,22 @@ struct ConstituentSystem : public TransitionSystem {
 
 struct DependencySystem : public TransitionSystem {
   unsigned num_actions() const { return 3; }
+  void get_oracle_actions(const std::vector<unsigned> & parents,
+                          std::vector<unsigned> & actions);
+  void get_oracle_actions_travel(const std::vector<std::vector<unsigned>> & tree,
+                                 unsigned now,
+                                 std::vector<unsigned> & actions);
   void get_valid_actions(const State & state, std::vector<unsigned> & actions);
   void perform_action(State & state, const unsigned & action) override;
   bool is_valid(const State & state, const unsigned & action) override;
   unsigned get_shift() override { return 0; }
   unsigned get_reduce() override { return 1; }
   void print_tree(const State & state, std::ostream & os) override;
-  unsigned _print_tree_get_depth(const std::vector<std::vector<unsigned>> & tree, unsigned now);
-  void _print_tree(const std::vector<std::vector<unsigned>> & tree,
-                   unsigned now,
-                   unsigned horizon_offset,
-                   std::vector<std::string> & canvas);
+  static unsigned _print_tree_get_depth(const std::vector<std::vector<unsigned>> & tree, unsigned now);
+  static void _print_tree(const std::vector<std::vector<unsigned>> & tree,
+                          unsigned now,
+                          unsigned horizon_offset,
+                          std::vector<std::string> & canvas);
 
   static bool is_shift(const unsigned & action) { return action == 0; }
   static bool is_left(const unsigned & action) { return action == 1; }

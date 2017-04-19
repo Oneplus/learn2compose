@@ -15,6 +15,42 @@ bool State::is_terminated() const {
   return (sigma.size() == 1 && beta >= n);
 }
 
+void ConstituentSystem::get_oracle_actions(const std::vector<unsigned>& parents,
+                                           std::vector<unsigned>& actions) {
+  unsigned n_nodes = parents.size();
+  std::vector<std::pair<unsigned, unsigned>> tree(n_nodes,
+                                                  std::pair<unsigned, unsigned>(UINT_MAX, UINT_MAX));
+  unsigned root = UINT_MAX;
+  for (unsigned i = 0; i < n_nodes; ++i) {
+    unsigned hed = parents[i];
+    if (hed == UINT_MAX) {
+      root = i;
+    } else {
+      if (tree[hed].first == UINT_MAX) { tree[hed].first = i; }
+      else if (tree[hed].second == UINT_MAX) { tree[hed].second = i; }
+      else { _ERROR << "Only binary tree is allowed."; exit(1); }
+    }
+  }
+  assert(root != UINT_MAX);
+  for (unsigned i = 0; i < n_nodes; ++i) {
+    assert((tree[i].first == UINT_MAX && tree[i].second == UINT_MAX) ||
+      (tree[i].first != UINT_MAX && tree[i].second != UINT_MAX));
+  }
+  get_oracle_actions_travel(tree, root, actions);
+}
+
+void ConstituentSystem::get_oracle_actions_travel(const std::vector<std::pair<unsigned, unsigned>>& tree,
+                                                  unsigned now,
+                                                  std::vector<unsigned>& actions) {
+  if (tree[now].first == UINT_MAX && tree[now].second == UINT_MAX) {
+    actions.push_back(get_shift());
+  } else {
+    get_oracle_actions_travel(tree, tree[now].first, actions);
+    get_oracle_actions_travel(tree, tree[now].second, actions);
+    actions.push_back(get_reduce());
+  }
+}
+
 void ConstituentSystem::get_valid_actions(const State & state,
                                           std::vector<unsigned>& actions) {
   if (state.beta < state.n) {
@@ -79,6 +115,37 @@ void ConstituentSystem::reduce(State & state) {
   state.pst[state.nid].first = left;
   state.pst[state.nid].second = right;
   state.nid++;
+}
+
+void DependencySystem::get_oracle_actions(const std::vector<unsigned>& parents,
+                                          std::vector<unsigned>& actions) {
+  unsigned root = UINT_MAX;
+  std::vector<std::vector<unsigned>> tree(parents.size());
+  for (unsigned i = 0; i < parents.size(); ++i) {
+    unsigned hed = parents[i];
+    if (hed == UINT_MAX) { root = i; }
+    else { tree[hed].push_back(i); }
+  }
+  assert(root != UINT_MAX);
+  get_oracle_actions_travel(tree, root, actions);
+}
+
+void DependencySystem::get_oracle_actions_travel(const std::vector<std::vector<unsigned>>& tree,
+                                                 unsigned now,
+                                                 std::vector<unsigned>& actions) {
+  const std::vector<unsigned> & node = tree[now];
+  unsigned i = 0;
+  for (i = 0; i < node.size() && node[i] < now; ++i) {
+    get_oracle_actions_travel(tree, node[i], actions);
+  }
+  actions.push_back(get_shift_id());
+  for (unsigned j = 0; j < i; ++j) {
+    actions.push_back(get_left_id());
+  }
+  for (unsigned j = i; j < node.size(); ++j) {
+    get_oracle_actions_travel(tree, node[j], actions);
+    actions.push_back(get_right_id());
+  }
 }
 
 void DependencySystem::get_valid_actions(const State & state,
@@ -188,10 +255,12 @@ TransitionSystem * get_system(const std::string & name) {
   TransitionSystem * system = nullptr;
   if (name == "constituent" || name == "cons") {
     system = new ConstituentSystem();
-  } else if (name == "dependency" || name == "dep") {
+  } else if (name == "dependency" || name == "dep" ||
+             name == "dependency_bilstm" || name == "dep_bilstm") {
     system = new DependencySystem();
   } else {
     _ERROR << "Unknown state builder name: " << name;
+    exit(1);
   }
   return system;
 }

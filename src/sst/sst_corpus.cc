@@ -84,7 +84,8 @@ void SSTCorpus::parse_data(const std::string& data, SSTInstance& input,
   boost::algorithm::split(tokens, sentence_str, boost::is_any_of(" "), boost::token_compress_on);
 
   input.sentence.clear();
-  for (const auto& token : tokens) {
+  for (auto& token : tokens) {
+    boost::replace_all(token, "\\", "");
     input.sentence.push_back(
       allow_new_token ?
       word_map.insert(token) :

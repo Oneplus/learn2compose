@@ -41,7 +41,8 @@ struct YelpAvgPipeL2CModel : public Model {
   unsigned predict(const YelpInstance & inst, State & state);
 
   dynet::expr::Expression get_policy_logits(TreeLSTMState * machine,
-                                            const State & state) override;
+                                            const State & state,
+                                            bool train) override;
 
   dynet::expr::Expression get_classifier_logits(dynet::expr::Expression repr);
 

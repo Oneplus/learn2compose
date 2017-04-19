@@ -16,8 +16,12 @@ add_library (common
 	treelstm.h
 	trainer_utils.cc
 	trainer_utils.h
+	misc.h
+	misc.cc
+	math_utils.h
+	math_utils.cc
 	)
 
 add_subdirectory(l2c.snli)
-add_subdirectory(l2c.sst)
+add_subdirectory(sst)
 add_subdirectory(l2c.yelp)

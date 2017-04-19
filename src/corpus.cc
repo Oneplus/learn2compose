@@ -22,9 +22,11 @@ unsigned Corpus::get_or_add_word(const std::string& word) {
 void load_word_embeddings(const std::string& embedding_file,
                           unsigned dim,
                           Embeddings & embeddings,
-                          Corpus& corpus) {
-  embeddings[corpus.get_or_add_word(Corpus::BAD0)] = std::vector<float>(dim, 0.);
-  embeddings[corpus.get_or_add_word(Corpus::UNK)] = std::vector<float>(dim, 0.);
+                          Corpus& corpus,
+                          bool set_zero_to_bad0,
+                          bool set_zero_to_unk) {
+  if (set_zero_to_bad0) { embeddings[corpus.get_or_add_word(Corpus::BAD0)] = std::vector<float>(dim, 0.); }
+  if (set_zero_to_unk) { embeddings[corpus.get_or_add_word(Corpus::UNK)] = std::vector<float>(dim, 0.); }
   _INFO << "Main:: Loading from " << embedding_file << " with " << dim << " dimensions.";
   std::ifstream ifs(embedding_file);
   BOOST_ASSERT_MSG(ifs, "Failed to load embedding file.");

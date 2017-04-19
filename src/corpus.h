@@ -6,12 +6,6 @@
 #include <set>
 #include "alphabet.h"
 
-struct Instance {
-  unsigned label;
-  std::vector<unsigned> sentence1;
-  std::vector<unsigned> sentence2;
-};
-
 struct Corpus {
   const static char* UNK;
   const static char* BAD0;
@@ -23,9 +17,6 @@ struct Corpus {
   Alphabet word_map;
   Corpus();
 
-  virtual void load_training_data(const std::string& filename, bool allow_new_token = false) = 0;
-  virtual void load_devel_data(const std::string& filename) = 0;
-  virtual void load_test_data(const std::string& filename) = 0;
   unsigned get_or_add_word(const std::string& word);
 };
 
@@ -34,6 +25,8 @@ typedef std::unordered_map<unsigned, std::vector<float>> Embeddings;
 void load_word_embeddings(const std::string& embedding_file,
                           unsigned dim,
                           Embeddings & embeddings,
-                          Corpus& corpus);
+                          Corpus& corpus,
+                          bool set_zero_to_bad0 = false,
+                          bool set_zero_to_unk = false);
 
 #endif  //  end for CORPUS_H

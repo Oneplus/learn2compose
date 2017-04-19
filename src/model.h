@@ -22,62 +22,103 @@ struct Model {
 
   dynet::expr::Expression reinforce(dynet::ComputationGraph & cg,
                                     const std::vector<dynet::expr::Expression> & input,
-                                    std::vector<dynet::expr::Expression> & probs);
+                                    std::vector<dynet::expr::Expression> & trans_logits,
+                                    std::vector<unsigned>& actions,
+                                    bool train);
 
   dynet::expr::Expression decode(dynet::ComputationGraph & cg,
                                  const std::vector<dynet::expr::Expression> & input,
-                                 std::vector<dynet::expr::Expression> & probs,
-                                 State & state);
+                                 std::vector<dynet::expr::Expression> & trans_logits,
+                                 std::vector<unsigned> & actions,
+                                 State & state,
+                                 bool train);
 
   dynet::expr::Expression decode(dynet::ComputationGraph & cg,
                                  const std::vector<dynet::expr::Expression> & input,
-                                 State & state);
+                                 State & state,
+                                 bool train);
 
   dynet::expr::Expression decode(dynet::ComputationGraph & cg,
                                  const std::vector<dynet::expr::Expression> & input,
-                                 std::vector<dynet::expr::Expression> & probs);
+                                 std::vector<dynet::expr::Expression> & trans_logits,
+                                 std::vector<unsigned> & actions,
+                                 bool train);
 
   dynet::expr::Expression decode(dynet::ComputationGraph & cg,
-                                 const std::vector<dynet::expr::Expression> & input);
-
-  dynet::expr::Expression left(dynet::ComputationGraph & cg,
-                               const std::vector<dynet::expr::Expression> & input,
-                               State & state);
-
-  dynet::expr::Expression left(dynet::ComputationGraph & cg,
-                               const std::vector<dynet::expr::Expression> & input,
-                               std::vector<dynet::expr::Expression> & probs,
-                               State & state);
+                                 const std::vector<dynet::expr::Expression> & input,
+                                 bool train);
 
   dynet::expr::Expression left(dynet::ComputationGraph & cg,
                                const std::vector<dynet::expr::Expression> & input);
 
   dynet::expr::Expression left(dynet::ComputationGraph & cg,
                                const std::vector<dynet::expr::Expression> & input,
-                               std::vector<dynet::expr::Expression> & probs);
+                               State & state);
 
-  dynet::expr::Expression right(dynet::ComputationGraph & cg,
-                                const std::vector<dynet::expr::Expression> & input,
-                                State & state);
+  dynet::expr::Expression left(dynet::ComputationGraph & cg,
+                               const std::vector<dynet::expr::Expression> & input,
+                               std::vector<dynet::expr::Expression> & trans_logits,
+                               std::vector<unsigned> & actions,
+                               bool train);
 
-  dynet::expr::Expression right(dynet::ComputationGraph & cg,
-                                const std::vector<dynet::expr::Expression> & input,
-                                std::vector<dynet::expr::Expression> & probs,
-                                State & state);
+  dynet::expr::Expression left(dynet::ComputationGraph & cg,
+                               const std::vector<dynet::expr::Expression> & input,
+                               std::vector<dynet::expr::Expression> & trans_logits,
+                               std::vector<unsigned> & actions,
+                               State & state,
+                               bool train);
 
   dynet::expr::Expression right(dynet::ComputationGraph & cg,
                                 const std::vector<dynet::expr::Expression> & input);
 
   dynet::expr::Expression right(dynet::ComputationGraph & cg,
                                 const std::vector<dynet::expr::Expression> & input,
-                                std::vector<dynet::expr::Expression> & probs);
+                                State & state);
+
+  dynet::expr::Expression right(dynet::ComputationGraph & cg,
+                                const std::vector<dynet::expr::Expression> & input,
+                                std::vector<dynet::expr::Expression> & trans_logits,
+                                std::vector<unsigned> & actions,
+                                State & state,
+                                bool train);
+
+  dynet::expr::Expression right(dynet::ComputationGraph & cg,
+                                const std::vector<dynet::expr::Expression> & input,
+                                std::vector<dynet::expr::Expression> & trans_logits,
+                                std::vector<unsigned> & actions,
+                                bool train);
+
+  dynet::expr::Expression execute(dynet::ComputationGraph & cg,
+                                  const std::vector<dynet::expr::Expression> & input,
+                                  const std::vector<unsigned> & actions,
+                                  std::vector<dynet::expr::Expression> & trans_logits,
+                                  State & state,
+                                  bool train);
+
+  dynet::expr::Expression execute(dynet::ComputationGraph & cg,
+                                  const std::vector<dynet::expr::Expression> & input,
+                                  const std::vector<unsigned> & actions,
+                                  State & state,
+                                  bool train);
+
+  dynet::expr::Expression execute(dynet::ComputationGraph & cg,
+                                  const std::vector<dynet::expr::Expression> & input,
+                                  const std::vector<unsigned> & actions,
+                                  std::vector<dynet::expr::Expression> & trans_logits,
+                                  bool train);
+
+  dynet::expr::Expression execute(dynet::ComputationGraph & cg,
+                                  const std::vector<dynet::expr::Expression> & input,
+                                  const std::vector<unsigned> & actions,
+                                  bool train);
 
   void set_policy(const std::string & policy_name);
 
   void set_policy(const POLICY_TYPE & policy_type_);
 
   virtual dynet::expr::Expression get_policy_logits(TreeLSTMState * machine,
-                                                    const State & state) = 0;
+                                                    const State & state,
+                                                    bool train) = 0;
 };
 
 #endif  //  end for MODEL_H

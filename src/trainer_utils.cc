@@ -30,11 +30,12 @@ dynet::Trainer* get_trainer(const po::variables_map& conf, dynet::Model& model) 
     trainer = new dynet::MomentumSGDTrainer(model);
     trainer->eta_decay = 0.08f;
   } else if (conf["optimizer"].as<std::string>() == "adagrad") {
-    trainer = new dynet::AdagradTrainer(model);
+    float eta0 = (conf.count("optimizer_eta") ? conf["optimizer_eta"].as<float>() : 0.1f);
+    trainer = new dynet::AdagradTrainer(model, eta0);
   } else if (conf["optimizer"].as<std::string>() == "adadelta") {
     trainer = new dynet::AdadeltaTrainer(model);
   } else if (conf["optimizer"].as<std::string>() == "rmsprop") {
-    trainer = new dynet::RmsPropTrainer(model);
+    trainer = new dynet::RMSPropTrainer(model);
   } else if (conf["optimizer"].as<std::string>() == "adam") {
     // default setting is same with Kingma and Ba (2015). 
     float eta0 = (conf.count("optimizer_eta") ? conf["optimizer_eta"].as<float>() : 0.001f);

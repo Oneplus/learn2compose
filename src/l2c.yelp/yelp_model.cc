@@ -38,17 +38,18 @@ dynet::expr::Expression YelpAvgPipeL2CModel::objective(dynet::ComputationGraph &
   new_graph(cg);
   unsigned len = inst.document.size();
   std::vector<dynet::expr::Expression> input(len);
+  std::vector<unsigned> actions;
   for (unsigned i = 0; i < len; ++i) { input[i] = sentence_expr(inst, i); }
   std::vector<dynet::expr::Expression> transition_probs;
   dynet::expr::Expression final_repr;
   if (policy_type == kSample && objective_type == kRewardOnly) {
-    final_repr = decode(cg, input);
+    final_repr = decode(cg, input, true);
   } else if (policy_type == kLeft) {
     final_repr = left(cg, input);
   } else if (policy_type == kRight) {
     final_repr = right(cg, input);
   } else {
-    final_repr = reinforce(cg, input, transition_probs);
+    final_repr = reinforce(cg, input, transition_probs, actions, true);
   }
 
   // neg -> minimize
@@ -80,7 +81,7 @@ unsigned YelpAvgPipeL2CModel::predict(const YelpInstance & inst) {
 
   dynet::expr::Expression final_repr;
   if (policy_type == kSample) {
-    final_repr = decode(cg, input);
+    final_repr = decode(cg, input, false);
   } else if (policy_type == kLeft) {
     final_repr = left(cg, input);
   } else {
@@ -101,7 +102,7 @@ unsigned YelpAvgPipeL2CModel::predict(const YelpInstance & inst, State & state) 
 
   dynet::expr::Expression final_repr;
   if (policy_type == kSample) {
-    final_repr = decode(cg, input, state);
+    final_repr = decode(cg, input, state, false);
   } else if (policy_type == kLeft) {
     final_repr = left(cg, input, state);
   } else {
@@ -114,7 +115,8 @@ unsigned YelpAvgPipeL2CModel::predict(const YelpInstance & inst, State & state) 
 }
 
 dynet::expr::Expression YelpAvgPipeL2CModel::get_policy_logits(TreeLSTMState * machine,
-                                                               const State & state) {
+                                                               const State & state,
+                                                               bool train) {
   return policy_scorer.get_output(dynet::expr::rectify(
     policy_projector.get_output(machine->state_repr(state)))
   );
